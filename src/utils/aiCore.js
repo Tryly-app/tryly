@@ -1,36 +1,51 @@
 // src/utils/aiCore.js
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Inicializa a IA com a chave que está no arquivo .env
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 export async function processReflection(text, missionAttribute) {
-  // Simula um tempo de "pensamento" da IA para dar credibilidade
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  try {
+    // Se não tiver chave configurada, usa o modo offline (fallback)
+    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+      console.warn("Sem chave API. Usando modo offline.");
+      return fallbackResponse(text);
+    }
 
-  const lowerText = text.toLowerCase();
+    // Configura o modelo (Gemini 1.5 Flash é rápido e barato/grátis)
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-  // 1. ANÁLISE DE SENTIMENTO (BÁSICA)
-  
-  // Palavras que indicam SUCESSO / CONQUISTA
-  const successKeywords = ['consegui', 'fiz', 'feito', 'fácil', 'legal', 'top', 'incrivel', 'incrível', 'boa', 'deu certo', 'venci', 'otimo', 'ótimo'];
-  
-  // Palavras que indicam DIFICULDADE / FALHA / MEDO
-  const struggleKeywords = ['não consegui', 'nao consegui', 'difícil', 'dificil', 'medo', 'vergonha', 'travou', 'quase', 'ruim', 'chato', 'tentei mas'];
+    // O Prompt define a "Personalidade" do seu App
+    const prompt = `
+      Você é o mentor do app "Tryly". Sua persona é: Estoico, direto, motivador, focado na ação e no progresso, não na perfeição.
+      O usuário acabou de completar uma missão focada no atributo: "${missionAttribute}".
+      
+      Relato do usuário: "${text}"
+      
+      Sua tarefa:
+      1. Analise o relato.
+      2. Dê um feedback curto (máximo 2 frases).
+      3. Se ele falhou, incentive a tentar de novo (o erro é dado).
+      4. Se ele conseguiu, parabenize pela audácia, não pelo talento.
+      5. Termine SEMPRE com a frase exata: "Go Try."
+    `;
 
-  // 2. SELEÇÃO DA RESPOSTA (PERSONA "GO TRY")
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
 
-  // CENÁRIO A: Usuário indicou dificuldade ou falha
-  if (struggleKeywords.some(word => lowerText.includes(word))) {
-    return "Sem problemas. Errar é apenas coletar dados. Até os maiores gênios falharam antes de acertar. O importante é que você não ficou parado na fila. Amanhã a gente ajusta o plano. Go Try.";
+  } catch (error) {
+    console.error("Erro na IA:", error);
+    // Se a IA falhar (internet, cota, etc), usa a resposta programada para não travar o app
+    return fallbackResponse(text);
   }
+}
 
-  // CENÁRIO B: Usuário indicou sucesso
-  if (successKeywords.some(word => lowerText.includes(word))) {
-    return "Eficiente. Você acaba de descobrir que o mundo é moldável por quem age. Saboreie essa vitória, mas não relaxe. O sistema é grande e a gente só começou. Go Try.";
+// --- RESPOSTA DE EMERGÊNCIA (Caso a IA falhe) ---
+function fallbackResponse(text) {
+  const lower = text.toLowerCase();
+  if (lower.includes('não') || lower.includes('dificil') || lower.includes('medo')) {
+    return "O erro é apenas um dado. O importante é que você não ficou parado. Amanhã tentamos de novo. Go Try.";
   }
-
-  // CENÁRIO C: Texto muito curto ou preguiçoso (Cobrança)
-  if (text.length < 15) {
-    return "O conforto é uma armadilha silenciosa. Tentar já te coloca na frente de 99% das pessoas. Você vai ser o cara que faz ou o que assiste? Acorda. Go Try.";
-  }
-
-  // CENÁRIO D: Resposta padrão inspiradora (Neutro/Positivo)
-  return `Tentar já é vencer! Você acabou de ganhar +${missionAttribute}. A consistência é o segredo que ninguém te conta. Continue assim. Go Try.`;
+  return "Excelente execução. A consistência vence o talento. Continue acumulando pequenas vitórias. Go Try.";
 }
