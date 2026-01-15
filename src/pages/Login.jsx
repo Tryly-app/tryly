@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { AlertCircle, XCircle } from 'lucide-react'; // Ícones para o erro
 
-// Ícones Oficiais
+// Ícones Oficiais (Mantidos)
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -23,46 +24,71 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [fullName, setFullName] = useState('');
+  
+  // NOVO: Estado para mensagem de erro
+  const [errorMsg, setErrorMsg] = useState(null);
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMsg(null); // Limpa erro anterior
 
-    let result;
-    if (isSignUp) {
-      result = await supabase.auth.signUp({
-        email, password,
-        options: { data: { full_name: fullName } }
-      });
-    } else {
-      result = await supabase.auth.signInWithPassword({ email, password });
-    }
+    try {
+      let result;
+      if (isSignUp) {
+        result = await supabase.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName } }
+        });
+      } else {
+        result = await supabase.auth.signInWithPassword({ email, password });
+      }
 
-    if (result.error) {
-      alert(result.error.message);
-    } else if (isSignUp) {
-      alert("Cadastro realizado! Verifique seu email ou faça login.");
-      setIsSignUp(false);
+      if (result.error) {
+        // Traduzindo erros comuns do Supabase para português amigável
+        if (result.error.message.includes("Invalid login")) {
+          throw new Error("Email ou senha incorretos.");
+        } else if (result.error.message.includes("User already registered")) {
+          throw new Error("Este email já está cadastrado.");
+        } else {
+          throw new Error(result.error.message);
+        }
+      } 
+      
+      if (isSignUp && !result.error) {
+        // Sucesso no cadastro (mas verifica se precisa confirmar email)
+        if (result.data?.user?.identities?.length === 0) {
+            throw new Error("Este email já existe.");
+        }
+        alert("Cadastro realizado! Faça login."); // Aqui pode ser alert simples pois é sucesso
+        setIsSignUp(false);
+      }
+
+    } catch (error) {
+      setErrorMsg(error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSocialLogin = async (provider) => {
     setLoading(true);
+    setErrorMsg(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: provider,
       options: {
         redirectTo: window.location.origin
       }
     });
-    if (error) alert("Erro ao conectar: " + error.message);
+    if (error) {
+        setErrorMsg("Erro ao conectar com " + provider);
+    }
     setLoading(false);
   };
 
   return (
     <div className="container" style={{justifyContent: 'center', textAlign: 'center'}}>
       
-      {/* CABEÇALHO DO MANIFESTO */}
       <div className="center mb-4">
         <h1 style={{letterSpacing: '-2px', fontSize: '3rem', marginBottom: 5}}>TRYLY</h1>
         <p style={{fontSize: '1rem', color: '#1e293b', fontWeight: '600', marginBottom: 5}}>
@@ -74,6 +100,19 @@ export default function Login() {
       </div>
 
       <form onSubmit={handleAuth} style={{marginTop: 20}}>
+        
+        {/* CARD DE ERRO (Só aparece se houver erro) */}
+        {errorMsg && (
+            <div style={{
+                background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', 
+                padding: '12px', borderRadius: 8, marginBottom: 15, fontSize: '0.9rem',
+                display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left'
+            }}>
+                <AlertCircle size={20} style={{minWidth: 20}} />
+                <span>{errorMsg}</span>
+            </div>
+        )}
+
         {isSignUp && (
           <input 
             type="text" placeholder="Seu Nome de Herói" required
@@ -89,18 +128,16 @@ export default function Login() {
           value={password} onChange={e => setPassword(e.target.value)}
         />
         <button type="submit" disabled={loading}>
-          {loading ? 'Processando...' : (isSignUp ? 'Aceitar o Desafio' : 'Entrar')}
+          {loading ? 'Processando...' : (isSignUp ? 'Aceitar o Desafio' : 'Entrar no Sistema')}
         </button>
       </form>
 
-      {/* DIVISOR */}
       <div style={{display: 'flex', alignItems: 'center', margin: '25px 0', color: '#94a3b8'}}>
         <div style={{flex: 1, height: 1, background: '#e2e8f0'}}></div>
         <span style={{padding: '0 10px', fontSize: '0.7rem', fontWeight: 'bold'}}>ACESSO RÁPIDO</span>
         <div style={{flex: 1, height: 1, background: '#e2e8f0'}}></div>
       </div>
 
-      {/* BOTÕES SOCIAIS */}
       <div style={{display: 'flex', gap: '12px', flexDirection: 'column'}}>
         <button 
             type="button" 
@@ -128,7 +165,7 @@ export default function Login() {
       </div>
 
       <div className="center mt-4">
-        <button className="outline" style={{border: 'none', color: '#64748B', fontSize: '0.9rem'}} onClick={() => setIsSignUp(!isSignUp)}>
+        <button className="outline" style={{border: 'none', color: '#64748B', fontSize: '0.9rem'}} onClick={() => {setIsSignUp(!isSignUp); setErrorMsg(null);}}>
           {isSignUp ? 'Já tem conta? Entrar' : 'Criar nova conta'}
         </button>
       </div>

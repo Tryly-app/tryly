@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { processReflection } from '../utils/aiCore';
-import { User, Flame, Clock, Settings, X, Bell, Download, Share } from 'lucide-react'; // Adicionados Download e Share
+import { User, Flame, Clock, Settings, X, Bell, Download, Share } from 'lucide-react';
 
 export default function Dashboard({ session }) {
   const navigate = useNavigate();
@@ -15,10 +15,10 @@ export default function Dashboard({ session }) {
   const [activeTrail, setActiveTrail] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   
-  // Estados de Popups (NOVOS)
-  const [deferredPrompt, setDeferredPrompt] = useState(null); // Para instalação Android
-  const [showInstallPopup, setShowInstallPopup] = useState(false); // Popup Roxo de Instalar
-  const [showReminder, setShowReminder] = useState(false); // Popup de Lembrete da Missão
+  // Estados de Popups
+  const [deferredPrompt, setDeferredPrompt] = useState(null); 
+  const [showInstallPopup, setShowInstallPopup] = useState(false); 
+  const [showReminder, setShowReminder] = useState(false); 
   const [reminderMessage, setReminderMessage] = useState({ title: '', text: '', action: '' });
   const [isIOS, setIsIOS] = useState(false);
 
@@ -36,11 +36,10 @@ export default function Dashboard({ session }) {
     // 2. Verifica se já está instalado (Modo Standalone)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
-    // 3. Listener para Android/Chrome (Captura o evento de instalação)
+    // 3. Listener para Android/Chrome
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      // Só mostra o popup de instalar se NÃO estiver instalado
       if (!isStandalone) {
          setShowInstallPopup(true);
       }
@@ -48,7 +47,7 @@ export default function Dashboard({ session }) {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // 4. Fallback para iOS (Mostra popup após 3s se não estiver instalado)
+    // 4. Fallback para iOS
     if (ios && !isStandalone) {
        setTimeout(() => setShowInstallPopup(true), 3000);
     }
@@ -103,14 +102,12 @@ export default function Dashboard({ session }) {
       setProgress(prog);
       setCurrentMission(mission);
 
-      // CORREÇÃO IMPORTANTE: Chama o lembrete sempre. A renderização (return) decidirá se exibe ou não.
       checkReminder(prog);
     }
     setLoading(false);
   };
 
   const checkReminder = (prog) => {
-    // Se for usuário novo (Dia 1 e nunca fez nada), NÃO mostra popup
     if (prog.current_day === 1 && (prog.status === 'new' || !prog.status)) {
         return;
     }
@@ -118,7 +115,6 @@ export default function Dashboard({ session }) {
     const today = new Date().toISOString().split('T')[0];
     const isCompletedToday = prog.last_completed_at === today && prog.status === 'completed';
 
-    // Cenário 1: Missão em Aberto (Nem começou)
     if (!isCompletedToday && prog.status !== 'in_progress') {
         setReminderMessage({
             title: "O tempo está passando...",
@@ -127,7 +123,6 @@ export default function Dashboard({ session }) {
         });
         setShowReminder(true);
     }
-    // Cenário 2: Começou mas não terminou
     else if (prog.status === 'in_progress') {
         setReminderMessage({
             title: "Não deixe pela metade",
@@ -138,7 +133,6 @@ export default function Dashboard({ session }) {
     }
   };
 
-  // Função para lidar com clique no botão "Instalar"
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -150,7 +144,6 @@ export default function Dashboard({ session }) {
     }
   };
 
-  // Ao fechar popup de instalação, garantimos que o de lembrete possa aparecer
   const handleCloseInstall = () => {
       setShowInstallPopup(false);
   };
@@ -202,7 +195,6 @@ export default function Dashboard({ session }) {
     fetchData();
   };
 
-  // Funções de ação do Popup de Lembrete
   const handlePopupAction = () => {
       setShowReminder(false);
       if (progress.status === 'in_progress') {
@@ -214,7 +206,7 @@ export default function Dashboard({ session }) {
 
   if (loading && !aiResponse) return <div className="container center"><p>Carregando...</p></div>;
 
-  // VIEWS SECUNDÁRIAS (IDÊNTICAS AO SEU ARQUIVO)
+  // VIEWS
   if (view === 'reflection') return ( <div className="container"><h2>Check-in Diário</h2><p className="mb-4">Como foi realizar: <strong>"{currentMission?.action_text}"</strong>?</p><textarea rows="6" placeholder="Escreva aqui..." value={reflectionText} onChange={e => setReflectionText(e.target.value)} /><button onClick={submitReflection} disabled={loading}>{loading ? 'Analisando...' : 'Enviar Relato'}</button><button className="outline mt-4" onClick={() => setView('dashboard')}>Cancelar</button></div> );
   if (view === 'feedback') return ( <div className="container center" style={{justifyContent:'center'}}><div style={{fontSize: '4rem', marginBottom: 10}}>✨</div><h2 style={{color: '#7C3AED'}}>Missão Cumprida!</h2><div className="mission-card" style={{border: 'none', background: '#F3E8FF', boxShadow: 'none'}}><small style={{fontWeight: 'bold'}}>FEEDBACK DO SISTEMA</small><p style={{color: '#4B5563', fontStyle: 'italic', marginTop: 15}}>"{aiResponse}"</p><div className="status-badge" style={{marginTop: 20, background: '#fff'}}>+ {currentMission?.attribute}</div></div><button onClick={backToHome} style={{marginTop: 30}}>Voltar ao Menu</button></div> );
   if (view === 'mission') return ( <div className="container"><div className="status-badge">Dia {currentMission?.day_number}</div><h1>{currentMission?.title}</h1><p style={{fontSize: '1.1rem', marginTop: 20}}>{currentMission?.description}</p><div className="mission-card"><h3 style={{color: '#7C3AED'}}>Sua Ação</h3><p style={{fontWeight: '600', fontSize: '1.2rem'}}>{currentMission?.action_text}</p></div><div style={{marginTop: 'auto'}}><button onClick={startMission}>Aceitar Desafio</button><button className="outline mt-4" onClick={() => setView('dashboard')}>Voltar</button></div></div> );
@@ -286,7 +278,7 @@ export default function Dashboard({ session }) {
         )}
       </div>
 
-      {/* --- POPUP 1: INSTALAÇÃO DO APP (NOVO) --- */}
+      {/* --- POPUP 1: INSTALAÇÃO DO APP --- */}
       {showInstallPopup && (
         <div className="popup-overlay" style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200,
@@ -301,17 +293,26 @@ export default function Dashboard({ session }) {
                          <span style={{color: '#7C3AED', fontSize: '1.8rem', fontWeight: 'bold'}}>T</span>
                      </div>
                      <div>
-                         <h3 style={{margin: 0, fontSize: '1.2rem'}}>Instale o App</h3>
-                         <p style={{margin: 0, fontSize: '0.9rem', opacity: 0.9}}>Foco total, sem distrações do navegador.</p>
+                         <h3 style={{margin: 0, fontSize: '1.2rem', color: '#fff'}}>Instale o App</h3>
+                         <p style={{margin: 0, fontSize: '0.9rem', color: '#e9d5ff'}}>Foco total, sem distrações do navegador.</p>
                      </div>
                 </div>
 
                 {isIOS ? (
-                    <div style={{background: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 10, fontSize: '0.9rem', marginBottom: 15}}>
-                        <p style={{margin: 0, display: 'flex', alignItems: 'center', gap: 5}}>
-                            1. Toque em Compartilhar <Share size={16}/>
+                    <div style={{
+                        background: 'rgba(0,0,0,0.25)', // Fundo escuro transparente para contraste
+                        padding: 15, 
+                        borderRadius: 10, 
+                        fontSize: '0.9rem', 
+                        marginBottom: 15,
+                        border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                        <p style={{margin: 0, display: 'flex', alignItems: 'center', gap: 5, color: '#fff', fontWeight: '500'}}>
+                            1. Toque em Compartilhar <Share size={16} color="#fff"/>
                         </p>
-                        <p style={{margin: '5px 0 0 0'}}>2. Selecione "Adicionar à Tela de Início"</p>
+                        <p style={{margin: '5px 0 0 0', color: '#fff', fontWeight: '500'}}>
+                            2. Selecione "Adicionar à Tela de Início"
+                        </p>
                     </div>
                 ) : (
                     <button 
@@ -329,7 +330,7 @@ export default function Dashboard({ session }) {
         </div>
       )}
 
-      {/* --- POPUP 2: LEMBRETE (SÓ APARECE SE O DE INSTALAÇÃO NÃO ESTIVER NA TELA) --- */}
+      {/* --- POPUP 2: LEMBRETE --- */}
       {showReminder && !showInstallPopup && (
         <div style={{
             position: 'fixed', bottom: 20, left: 20, right: 20, zIndex: 100,
@@ -367,7 +368,6 @@ export default function Dashboard({ session }) {
         </div>
       )}
 
-      {/* Estilo para animação do popup */}
       <style>{`
         @keyframes slideUp {
           from { transform: translateY(100px); opacity: 0; }
