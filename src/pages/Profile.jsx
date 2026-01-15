@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Lock, Save, History, UploadCloud } from 'lucide-react';
+import { ArrowLeft, Camera, Lock, Save, History } from 'lucide-react';
 
 export default function Profile({ session }) {
   const navigate = useNavigate();
@@ -55,21 +55,17 @@ export default function Profile({ session }) {
 
       const file = event.target.files[0];
       const fileExt = file.name.split('.').pop();
-      // Nome do arquivo único para evitar conflito (timestamp)
       const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // 1. Upload para o Supabase Storage (Bucket 'avatars')
       let { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // 2. Pegar a URL pública da imagem enviada
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
       
-      // 3. Atualizar o estado visual imediatamente
       setAvatarUrl(data.publicUrl);
       setMsg({ type: 'success', text: 'Imagem carregada! Clique em Salvar para confirmar.' });
 
@@ -89,14 +85,13 @@ export default function Profile({ session }) {
       const updates = {
         id: session.user.id,
         full_name: fullName,
-        avatar_url: avatarUrl, // Salva a URL da nova foto
+        avatar_url: avatarUrl,
         updated_at: new Date(),
       };
 
       const { error } = await supabase.from('profiles').upsert(updates);
       if (error) throw error;
 
-      // Atualiza nome na sessão também
       await supabase.auth.updateUser({ data: { full_name: fullName } });
 
       if (newPassword) {
@@ -113,9 +108,12 @@ export default function Profile({ session }) {
     }
   };
 
+  // --- MUDANÇA AQUI: LOGOUT FORÇADO PARA MOBILE ---
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate('/');
+    // Em vez de navigate('/'), forçamos o recarregamento total da página
+    // Isso garante que o celular limpe a sessão da memória
+    window.location.href = '/'; 
   };
 
   return (
@@ -148,7 +146,6 @@ export default function Profile({ session }) {
              )}
           </div>
           
-          {/* Botão Input Arquivo Escondido + Label Bonito */}
           <div style={{position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)'}}>
             <label htmlFor="single" style={{
               cursor: 'pointer',
