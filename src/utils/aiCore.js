@@ -1,33 +1,31 @@
-// src/utils/aiCore.js
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Inicializa a IA com a chave que está no arquivo .env
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-export async function processReflection(text, missionAttribute) {
+// Adicionei o parâmetro "badgeName" na função
+export async function processReflection(text, missionAttribute, badgeName) {
   try {
-    // Se não tiver chave configurada, usa o modo offline (fallback)
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
       console.warn("Sem chave API. Usando modo offline.");
       return fallbackResponse(text);
     }
 
-    // Configura o modelo (Gemini 1.5 Flash é rápido e barato/grátis)
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // O Prompt define a "Personalidade" do seu App
+    // Prompt atualizado para incluir o Selo Oficial
     const prompt = `
-      Você é o mentor do app "Tryly". Sua persona é: Estoico, direto, motivador, focado na ação e no progresso, não na perfeição.
-      O usuário acabou de completar uma missão focada no atributo: "${missionAttribute}".
+      Você é o mentor do app "Tryly". Persona: Estoico, direto, motivador.
+      
+      O usuário completou a missão de atributo: "${missionAttribute}".
+      Ao completar, ele ganhou o selo oficial: "${badgeName || 'Guerreiro'}".
       
       Relato do usuário: "${text}"
       
       Sua tarefa:
       1. Analise o relato.
-      2. Dê um feedback curto (máximo 2 frases).
-      3. Se ele falhou, incentive a tentar de novo (o erro é dado).
-      4. Se ele conseguiu, parabenize pela audácia, não pelo talento.
-      5. Termine SEMPRE com a frase exata: "Go Try."
+      2. Dê um feedback curto e poderoso (máximo 2 frases).
+      3. Se o relato for positivo, confirme que ele é digno do selo "${badgeName}".
+      4. Termine SEMPRE com: "Go Try."
     `;
 
     const result = await model.generateContent(prompt);
@@ -36,12 +34,10 @@ export async function processReflection(text, missionAttribute) {
 
   } catch (error) {
     console.error("Erro na IA:", error);
-    // Se a IA falhar (internet, cota, etc), usa a resposta programada para não travar o app
     return fallbackResponse(text);
   }
 }
 
-// --- RESPOSTA DE EMERGÊNCIA (Caso a IA falhe) ---
 function fallbackResponse(text) {
   const lower = text.toLowerCase();
   if (lower.includes('não') || lower.includes('dificil') || lower.includes('medo')) {

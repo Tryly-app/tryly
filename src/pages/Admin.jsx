@@ -257,7 +257,17 @@ export default function Admin({ session }) {
              <div style={{flex: 1}}><label>Dia</label><input type="number" value={formData.day_number || ''} onChange={e => setFormData({...formData, day_number: e.target.value})} /></div>
              <div style={{flex: 2}}><label>Atributo (XP)</label><input value={formData.attribute || ''} onChange={e => setFormData({...formData, attribute: e.target.value})} placeholder="Ex: Foco" /></div>
           </div>
-          <label>Título</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
+          
+          {/* --- NOVO CAMPO: NOME DO SELO --- */}
+          <label style={{marginTop: 10, display: 'block'}}>Nome do Selo (Badge)</label>
+          <input 
+            value={formData.badge_name || ''} 
+            onChange={e => setFormData({...formData, badge_name: e.target.value})} 
+            placeholder="Ex: Mente Blindada" 
+            style={{background: '#F3E8FF', borderColor: '#7C3AED', fontWeight: 'bold'}}
+          />
+
+          <label>Título da Missão</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
           <label>Descrição</label><textarea rows="3" value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
           <label>Ação (Botão)</label><input value={formData.action_text || ''} onChange={e => setFormData({...formData, action_text: e.target.value})} placeholder="Ex: Feito!" />
         </Modal>

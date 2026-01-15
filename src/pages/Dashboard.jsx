@@ -177,8 +177,7 @@ export default function Dashboard({ session }) {
   const submitReflection = async () => {
     if (reflectionText.length < 10) return alert("Escreva um pouco mais.");
     setLoading(true);
-    const feedback = await processReflection(reflectionText, currentMission.attribute);
-    setAiResponse(feedback);
+const feedback = await processReflection(reflectionText, currentMission.attribute, currentMission.badge_name);    setAiResponse(feedback);
     const today = new Date().toISOString().split('T')[0];
     await supabase.from('reflections').insert({ user_id: session.user.id, mission_id: currentMission.id, mission_day: currentMission.day_number, user_text: reflectionText, ai_feedback: feedback });
     await supabase.from('user_progress').update({ last_completed_at: today, status: 'completed', current_day: progress.current_day + 1 }).eq('user_id', session.user.id);

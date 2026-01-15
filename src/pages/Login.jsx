@@ -94,11 +94,9 @@ export default function Login() {
         />
 
         <p style={{fontSize: '1rem', color: '#1e293b', fontWeight: '600', marginBottom: 5}}>
-          Acelerador de Protagonismo
+          A vida recompensa quem tenta.
         </p>
-        <p style={{fontSize: '0.85rem', color: '#64748B', maxWidth: '300px', margin: '0 auto'}}>
-          Saia da fila da mediocridade. O foco é a tentativa, não a perfeição.
-        </p>
+        
       </div>
 
       <form onSubmit={handleAuth} style={{marginTop: 20}}>
