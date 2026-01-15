@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { AlertCircle, XCircle } from 'lucide-react'; // Ícones para o erro
+import { AlertCircle } from 'lucide-react';
 
-// Ícones Oficiais (Mantidos)
+// Ícone do Google
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -12,26 +12,18 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const AppleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 384 512" xmlns="http://www.w3.org/2000/svg">
-    <path fill="currentColor" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 52.3-11.4 69.5-34.3z" />
-  </svg>
-);
-
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [fullName, setFullName] = useState('');
-  
-  // NOVO: Estado para mensagem de erro
   const [errorMsg, setErrorMsg] = useState(null);
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMsg(null); // Limpa erro anterior
+    setErrorMsg(null);
 
     try {
       let result;
@@ -45,7 +37,6 @@ export default function Login() {
       }
 
       if (result.error) {
-        // Traduzindo erros comuns do Supabase para português amigável
         if (result.error.message.includes("Invalid login")) {
           throw new Error("Email ou senha incorretos.");
         } else if (result.error.message.includes("User already registered")) {
@@ -56,11 +47,10 @@ export default function Login() {
       } 
       
       if (isSignUp && !result.error) {
-        // Sucesso no cadastro (mas verifica se precisa confirmar email)
         if (result.data?.user?.identities?.length === 0) {
             throw new Error("Este email já existe.");
         }
-        alert("Cadastro realizado! Faça login."); // Aqui pode ser alert simples pois é sucesso
+        alert("Cadastro realizado! Faça login.");
         setIsSignUp(false);
       }
 
@@ -89,8 +79,20 @@ export default function Login() {
   return (
     <div className="container" style={{justifyContent: 'center', textAlign: 'center'}}>
       
-      <div className="center mb-4">
-        <h1 style={{letterSpacing: '-2px', fontSize: '3rem', marginBottom: 5}}>TRYLY</h1>
+      <div className="center mb-4" style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+        
+        {/* --- LOGO DO APP --- */}
+        <img 
+            src="/logo.png" 
+            alt="Logo Tryly" 
+            style={{
+                width: '100px', // Ajuste o tamanho aqui se achar pequeno/grande
+                height: 'auto', 
+                marginBottom: '15px',
+                borderRadius: '12px' // Deixa levemente arredondada (opcional)
+            }} 
+        />
+
         <p style={{fontSize: '1rem', color: '#1e293b', fontWeight: '600', marginBottom: 5}}>
           Acelerador de Protagonismo
         </p>
@@ -101,7 +103,7 @@ export default function Login() {
 
       <form onSubmit={handleAuth} style={{marginTop: 20}}>
         
-        {/* CARD DE ERRO (Só aparece se houver erro) */}
+        {/* CARD DE ERRO */}
         {errorMsg && (
             <div style={{
                 background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', 
@@ -128,7 +130,7 @@ export default function Login() {
           value={password} onChange={e => setPassword(e.target.value)}
         />
         <button type="submit" disabled={loading}>
-          {loading ? 'Processando...' : (isSignUp ? 'Aceitar o Desafio' : 'Entrar no Sistema')}
+          {loading ? 'Processando...' : (isSignUp ? 'Aceitar o Desafio' : 'Entrar na Conta')}
         </button>
       </form>
 
@@ -149,18 +151,6 @@ export default function Login() {
             }}
         >
             <GoogleIcon /> Continuar com Google
-        </button>
-        
-        <button 
-            type="button" 
-            onClick={() => handleSocialLogin('apple')}
-            style={{
-                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', 
-                background: '#000', color: '#fff', border: '1px solid #000',
-                fontWeight: '600', padding: '12px'
-            }}
-        >
-            <AppleIcon /> Continuar com Apple
         </button>
       </div>
 
