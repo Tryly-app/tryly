@@ -173,8 +173,11 @@ export default function Dashboard({ session }) {
     setAiResponse(feedback);
 
     const today = new Date().toISOString().split('T')[0];
+    
+    // --- CORREÇÃO AQUI: ADICIONADO mission_id ---
     await supabase.from('reflections').insert({
       user_id: session.user.id,
+      mission_id: currentMission.id, // Essencial para o histórico!
       mission_day: currentMission.day_number,
       user_text: reflectionText,
       ai_feedback: feedback
