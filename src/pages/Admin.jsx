@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical } from 'lucide-react';
 
-// --- CORREÇÃO: O componente Modal agora fica FORA da função principal ---
-// Isso resolve o problema de perder o foco ao digitar
 const Modal = ({ title, onClose, onSave, children }) => (
   <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
     <div className="mission-card" style={{width: '90%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', padding: 25}}>
@@ -22,20 +20,16 @@ export default function Admin({ session }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   
-  // View: 'list' (trilhas) ou 'detail' (missões)
   const [view, setView] = useState('list'); 
   const [trails, setTrails] = useState([]);
   const [selectedTrail, setSelectedTrail] = useState(null);
   const [missions, setMissions] = useState([]);
 
-  // Estados de Edição
   const [showTrailModal, setShowTrailModal] = useState(false);
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
-  const [tab, setTab] = useState('free'); // 'free' ou 'paid'
-
-  // Estado para Drag and Drop
+  const [tab, setTab] = useState('free');
   const [draggedItem, setDraggedItem] = useState(null);
 
   useEffect(() => {
@@ -66,78 +60,89 @@ export default function Admin({ session }) {
     setLoading(false);
   };
 
-  // --- DRAG & DROP ---
   const handleDragStart = (e, index) => setDraggedItem(index);
   const handleDragOver = (e) => e.preventDefault();
 
   const handleDrop = async (e, index) => {
     if (draggedItem === null || draggedItem === index) return;
-
     const currentTrails = trails.filter(t => (tab === 'paid' ? t.is_paid : !t.is_paid));
     const itemToMove = currentTrails[draggedItem];
-    
     const newList = [...currentTrails];
     newList.splice(draggedItem, 1);
     newList.splice(index, 0, itemToMove);
-
     const otherTrails = trails.filter(t => (tab === 'paid' ? !t.is_paid : t.is_paid));
     const newFullList = [...otherTrails, ...newList];
-    
     setTrails(newFullList); 
     setDraggedItem(null);
-
-    // Atualiza posições no banco
     for (let i = 0; i < newList.length; i++) {
         await supabase.from('trails').update({ position: i }).eq('id', newList[i].id);
     }
     fetchTrails();
   };
 
-  // --- CRUD TRILHAS ---
+  // --- CRUD TRILHAS (CORRIGIDO) ---
   const handleSaveTrail = async () => {
     if (!formData.title) return alert("Título obrigatório");
-    
-    // Força o booleano correto
     const isPaid = formData.is_paid === true; 
     
     try {
+        let error;
         if (editingItem) {
-          await supabase.from('trails').update({ ...formData, is_paid: isPaid }).eq('id', editingItem.id);
+          const res = await supabase.from('trails').update({ ...formData, is_paid: isPaid }).eq('id', editingItem.id);
+          error = res.error;
         } else {
           const maxPos = trails.length > 0 ? Math.max(...trails.map(t => t.position || 0)) : 0;
-          await supabase.from('trails').insert({ ...formData, is_paid: isPaid, position: maxPos + 1 });
+          const res = await supabase.from('trails').insert({ ...formData, is_paid: isPaid, position: maxPos + 1 });
+          error = res.error;
         }
+
+        if (error) throw error; // AGORA VAI AVISAR SE DER ERRO
+
         setShowTrailModal(false);
         fetchTrails();
     } catch (error) {
         alert("Erro ao salvar: " + error.message);
+        console.error(error);
     }
   };
 
   const handleDeleteTrail = async (id) => {
     if (confirm("Deletar trilha e suas missões?")) {
-      await supabase.from('trails').delete().eq('id', id);
-      fetchTrails();
+      const { error } = await supabase.from('trails').delete().eq('id', id);
+      if (error) alert(error.message);
+      else fetchTrails();
     }
   };
 
-  // --- CRUD MISSÕES ---
+  // --- CRUD MISSÕES (CORRIGIDO) ---
   const handleSaveMission = async () => {
     if (!formData.title || !formData.day_number) return alert("Dados incompletos");
     const payload = { ...formData, trail_id: selectedTrail.id };
-    if (editingItem) {
-      await supabase.from('missions').update(payload).eq('id', editingItem.id);
-    } else {
-      await supabase.from('missions').insert(payload);
+    
+    try {
+        let error;
+        if (editingItem) {
+          const res = await supabase.from('missions').update(payload).eq('id', editingItem.id);
+          error = res.error;
+        } else {
+          const res = await supabase.from('missions').insert(payload);
+          error = res.error;
+        }
+
+        if (error) throw error;
+
+        setShowMissionModal(false);
+        fetchMissions(selectedTrail.id);
+    } catch (error) {
+        alert("Erro ao salvar missão: " + error.message);
     }
-    setShowMissionModal(false);
-    fetchMissions(selectedTrail.id);
   };
 
   const handleDeleteMission = async (id) => {
     if (confirm("Apagar missão?")) {
-      await supabase.from('missions').delete().eq('id', id);
-      fetchMissions(selectedTrail.id);
+      const { error } = await supabase.from('missions').delete().eq('id', id);
+      if (error) alert(error.message);
+      else fetchMissions(selectedTrail.id);
     }
   };
 
@@ -156,7 +161,6 @@ export default function Admin({ session }) {
           </div>
 
           <button style={{marginBottom: 20}} onClick={() => { 
-              // Inicializa o formulário (IMPORTANTE: setar strings vazias para não quebrar o input)
               setFormData({ title: '', description: '', is_paid: tab === 'paid' }); 
               setEditingItem(null); 
               setShowTrailModal(true); 
@@ -191,7 +195,6 @@ export default function Admin({ session }) {
             ))}
             {trails.filter(t => (tab === 'paid' ? t.is_paid : !t.is_paid)).length === 0 && <p style={{textAlign: 'center', color: '#94a3b8'}}>Nenhuma trilha nesta categoria.</p>}
           </div>
-          <p style={{textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', marginTop: 20}}>Arraste os itens para definir a ordem sequencial.</p>
         </>
       )}
 
@@ -199,7 +202,7 @@ export default function Admin({ session }) {
         <>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
             <h3>Missões ({missions.length})</h3>
-            <button style={{width: 'auto', fontSize: '0.8rem', padding: '8px 12px'}} onClick={() => { setFormData({ day_number: missions.length + 1, title: '', description: '', action_text: '', attribute: '' }); setEditingItem(null); setShowMissionModal(true); }}><Plus size={14} style={{marginRight: 5}}/> Adicionar</button>
+            <button style={{width: 'auto', fontSize: '0.8rem', padding: '8px 12px'}} onClick={() => { setFormData({ day_number: missions.length + 1, title: '', description: '', action_text: '', attribute: '', badge_name: '' }); setEditingItem(null); setShowMissionModal(true); }}><Plus size={14} style={{marginRight: 5}}/> Adicionar</button>
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
             {missions.map(m => (
@@ -207,7 +210,7 @@ export default function Admin({ session }) {
                 <div>
                    <span className="status-badge" style={{padding: '2px 8px', fontSize: '0.65rem'}}>Dia {m.day_number}</span>
                    <strong style={{display: 'block', color: '#333'}}>{m.title}</strong>
-                   <span style={{fontSize: '0.8rem', color: '#64748B'}}>{m.attribute}</span>
+                   <span style={{fontSize: '0.8rem', color: '#64748B'}}>{m.attribute} {m.badge_name && `• ${m.badge_name}`}</span>
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column', gap: 5}}>
                    <button className="outline" style={{width: 'auto', padding: 5}} onClick={() => { setFormData(m); setEditingItem(m); setShowMissionModal(true); }}><Edit2 size={14}/></button>
@@ -219,33 +222,16 @@ export default function Admin({ session }) {
         </>
       )}
 
-      {/* --- MODAIS DE FORMULÁRIO --- */}
-      
       {showTrailModal && (
         <Modal title={editingItem ? "Editar Trilha" : "Nova Trilha"} onClose={() => setShowTrailModal(false)} onSave={handleSaveTrail}>
           <label style={{display:'block', textAlign:'left', marginBottom:5}}>Nome da Trilha</label>
-          <input 
-            value={formData.title || ''} // Proteção contra null
-            onChange={e => setFormData({...formData, title: e.target.value})} 
-            placeholder="Ex: Desbloqueio Social" 
-          />
+          <input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="Ex: Desbloqueio Social" />
           
           <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:10}}>Descrição Curta</label>
-          <input 
-            value={formData.description || ''} 
-            onChange={e => setFormData({...formData, description: e.target.value})} 
-            placeholder="Ex: Perca a timidez em 7 dias" 
-          />
+          <input value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Ex: Perca a timidez em 7 dias" />
           
-          {/* CHECKBOX PRO CORRIGIDO */}
           <div style={{display: 'flex', alignItems: 'center', gap: 10, marginTop: 20, padding: 10, background: '#f8fafc', borderRadius: 8}}>
-             <input 
-                type="checkbox" 
-                id="is_paid_check"
-                checked={formData.is_paid || false} 
-                onChange={e => setFormData({...formData, is_paid: e.target.checked})} 
-                style={{width: '20px', height: '20px'}} 
-             />
+             <input type="checkbox" id="is_paid_check" checked={formData.is_paid || false} onChange={e => setFormData({...formData, is_paid: e.target.checked})} style={{width: '20px', height: '20px'}} />
              <label htmlFor="is_paid_check" style={{margin: 0, cursor: 'pointer', fontWeight: 'bold', color: '#334155'}}>Esta trilha é exclusiva PRO?</label>
           </div>
         </Modal>
@@ -258,7 +244,6 @@ export default function Admin({ session }) {
              <div style={{flex: 2}}><label>Atributo (XP)</label><input value={formData.attribute || ''} onChange={e => setFormData({...formData, attribute: e.target.value})} placeholder="Ex: Foco" /></div>
           </div>
           
-          {/* --- NOVO CAMPO: NOME DO SELO --- */}
           <label style={{marginTop: 10, display: 'block'}}>Nome do Selo (Badge)</label>
           <input 
             value={formData.badge_name || ''} 
@@ -267,7 +252,7 @@ export default function Admin({ session }) {
             style={{background: '#F3E8FF', borderColor: '#7C3AED', fontWeight: 'bold'}}
           />
 
-          <label>Título da Missão</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
+          <label>Título</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
           <label>Descrição</label><textarea rows="3" value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
           <label>Ação (Botão)</label><input value={formData.action_text || ''} onChange={e => setFormData({...formData, action_text: e.target.value})} placeholder="Ex: Feito!" />
         </Modal>
