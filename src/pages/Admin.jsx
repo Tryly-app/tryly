@@ -80,7 +80,7 @@ export default function Admin({ session }) {
     fetchTrails();
   };
 
-  // --- CRUD TRILHAS (CORRIGIDO) ---
+  // --- CRUD TRILHAS ---
   const handleSaveTrail = async () => {
     if (!formData.title) return alert("Título obrigatório");
     const isPaid = formData.is_paid === true; 
@@ -96,13 +96,11 @@ export default function Admin({ session }) {
           error = res.error;
         }
 
-        if (error) throw error; // AGORA VAI AVISAR SE DER ERRO
-
+        if (error) throw error;
         setShowTrailModal(false);
         fetchTrails();
     } catch (error) {
         alert("Erro ao salvar: " + error.message);
-        console.error(error);
     }
   };
 
@@ -114,7 +112,7 @@ export default function Admin({ session }) {
     }
   };
 
-  // --- CRUD MISSÕES (CORRIGIDO) ---
+  // --- CRUD MISSÕES ---
   const handleSaveMission = async () => {
     if (!formData.title || !formData.day_number) return alert("Dados incompletos");
     const payload = { ...formData, trail_id: selectedTrail.id };
@@ -130,7 +128,6 @@ export default function Admin({ session }) {
         }
 
         if (error) throw error;
-
         setShowMissionModal(false);
         fetchMissions(selectedTrail.id);
     } catch (error) {
@@ -210,7 +207,8 @@ export default function Admin({ session }) {
                 <div>
                    <span className="status-badge" style={{padding: '2px 8px', fontSize: '0.65rem'}}>Dia {m.day_number}</span>
                    <strong style={{display: 'block', color: '#333'}}>{m.title}</strong>
-                   <span style={{fontSize: '0.8rem', color: '#64748B'}}>{m.attribute} {m.badge_name && `• ${m.badge_name}`}</span>
+                   {/* Agora mostra o XP no admin também */}
+                   <span style={{fontSize: '0.8rem', color: '#64748B'}}>{m.attribute} XP {m.badge_name && `• ${m.badge_name}`}</span>
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column', gap: 5}}>
                    <button className="outline" style={{width: 'auto', padding: 5}} onClick={() => { setFormData(m); setEditingItem(m); setShowMissionModal(true); }}><Edit2 size={14}/></button>
@@ -241,10 +239,20 @@ export default function Admin({ session }) {
         <Modal title={editingItem ? "Editar Missão" : "Nova Missão"} onClose={() => setShowMissionModal(false)} onSave={handleSaveMission}>
           <div style={{display: 'flex', gap: 10}}>
              <div style={{flex: 1}}><label>Dia</label><input type="number" value={formData.day_number || ''} onChange={e => setFormData({...formData, day_number: e.target.value})} /></div>
-             <div style={{flex: 2}}><label>Atributo (XP)</label><input value={formData.attribute || ''} onChange={e => setFormData({...formData, attribute: e.target.value})} placeholder="Ex: Foco" /></div>
+             
+             {/* CAMPO ALTERADO PARA NÚMERO (XP) */}
+             <div style={{flex: 2}}>
+                <label>XP (Recompensa)</label>
+                <input 
+                    type="number" 
+                    value={formData.attribute || ''} 
+                    onChange={e => setFormData({...formData, attribute: e.target.value})} 
+                    placeholder="Ex: 50" 
+                />
+             </div>
           </div>
           
-          <label style={{marginTop: 10, display: 'block'}}>Nome do Selo (Badge)</label>
+          <label style={{marginTop: 10, display: 'block'}}>Nome do Selo (Aparece no Perfil)</label>
           <input 
             value={formData.badge_name || ''} 
             onChange={e => setFormData({...formData, badge_name: e.target.value})} 
