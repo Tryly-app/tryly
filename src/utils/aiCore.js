@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-// Recebe agora o 'customPrompt' (texto do sócio)
+// Recebe agora o 'customPrompt' (texto do Admin)
 export async function processReflection(text, missionAttribute, badgeName, customPrompt) {
   try {
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
@@ -11,7 +11,7 @@ export async function processReflection(text, missionAttribute, badgeName, custo
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // 1. Define a PERSONALIDADE (Sócio vs Padrão)
+    // 1. Define a PERSONALIDADE (Admin vs Padrão)
     let personaInstruction = "";
 
     if (customPrompt && customPrompt.trim().length > 0) {

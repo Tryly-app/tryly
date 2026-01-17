@@ -221,7 +221,7 @@ export default function Admin({ session }) {
         </>
       )}
 
-      {/* --- MODAL DA TRILHA (AGORA COM CAMPO DE IA) --- */}
+      {/* --- MODAL DA TRILHA --- */}
       {showTrailModal && (
         <Modal title={editingItem ? "Editar Trilha" : "Nova Trilha"} onClose={() => setShowTrailModal(false)} onSave={handleSaveTrail}>
           <label style={{display:'block', textAlign:'left', marginBottom:5}}>Nome da Trilha</label>
@@ -230,7 +230,7 @@ export default function Admin({ session }) {
           <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:10}}>Descrição Curta</label>
           <input value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Ex: Perca a timidez em 7 dias" />
           
-          {/* NOVO CAMPO: PROMPT DA IA */}
+          {/* PROMPT DA IA */}
           <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:15, color: '#7C3AED', fontWeight: 'bold'}}>
             <BrainCircuit size={14} style={{marginRight: 5, display: 'inline'}} />
             Personalidade da IA (Prompt)

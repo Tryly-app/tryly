@@ -166,12 +166,11 @@ export default function Dashboard({ session }) {
     if (reflectionText.length < 10) return alert("Escreva um pouco mais.");
     setLoading(true);
     
-    // --- MÁGICA AQUI: Passamos o prompt personalizado da trilha ativa ---
     const feedback = await processReflection(
         reflectionText, 
         `${currentMission.attribute} XP`, 
         currentMission.badge_name,
-        activeTrail?.ai_prompt // <--- Novo parâmetro
+        activeTrail?.ai_prompt 
     );
     
     setAiResponse(feedback);

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { AlertCircle, ArrowLeft, Mail } from 'lucide-react'; // Adicionei ícones novos
+import { AlertCircle, ArrowLeft, Mail } from 'lucide-react';
 
-// Ícone do Google (Mantido)
+// Ícone do Google 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -17,10 +17,10 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isRecovery, setIsRecovery] = useState(false); // NOVO: Modo Recuperação
+  const [isRecovery, setIsRecovery] = useState(false); 
   const [fullName, setFullName] = useState('');
   const [errorMsg, setErrorMsg] = useState(null);
-  const [successMsg, setSuccessMsg] = useState(null); // NOVO: Mensagem de sucesso
+  const [successMsg, setSuccessMsg] = useState(null); 
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -79,7 +79,7 @@ export default function Login() {
         if (error) throw error;
 
         setSuccessMsg("E-mail de recuperação enviado! Verifique sua caixa de entrada (e spam).");
-        setEmail(''); // Limpa o campo
+        setEmail(''); 
     } catch (error) {
         setErrorMsg("Erro ao enviar e-mail: " + error.message);
     } finally {
