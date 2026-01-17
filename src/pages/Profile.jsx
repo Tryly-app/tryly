@@ -1,267 +1,241 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Lock, Save, History, Copy, Check, LogOut } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Mail } from 'lucide-react'; // Adicionei ícones novos
 
-export default function Profile({ session }) {
-  const navigate = useNavigate();
+// Ícone do Google (Mantido)
+const GoogleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+  </svg>
+);
+
+export default function Login() {
   const [loading, setLoading] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false); // Novo estado para o botão de sair
-  const [uploading, setUploading] = useState(false);
-  const [history, setHistory] = useState([]);
-  
-  // Estado para feedback visual de cópia
-  const [copied, setCopied] = useState(false); 
-  
-  // Estados do Formulário
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(false); // NOVO: Modo Recuperação
   const [fullName, setFullName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [msg, setMsg] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null); // NOVO: Mensagem de sucesso
 
-  useEffect(() => {
-    fetchProfileData();
-  }, [session]);
-
-  const fetchProfileData = async () => {
-    // 1. Busca dados do perfil
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-
-    if (profile) {
-      setFullName(profile.full_name || '');
-      setAvatarUrl(profile.avatar_url || `https://ui-avatars.com/api/?name=${session.user.email}&background=random`);
-    }
-
-    // 2. Busca histórico
-    const { data: historyData } = await supabase.from('reflections').select('*, missions(title, attribute)').eq('user_id', session.user.id).order('created_at', { ascending: false });
-    
-    setHistory(historyData || []);
-  };
-
-  const uploadAvatar = async (event) => {
-    try {
-      setUploading(true);
-      setMsg(null);
-
-      if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('Selecione uma imagem para upload.');
-      }
-
-      const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      let { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      
-      setAvatarUrl(data.publicUrl);
-      setMsg({ type: 'success', text: 'Imagem carregada! Clique em Salvar para confirmar.' });
-
-    } catch (error) {
-      setMsg({ type: 'error', text: 'Erro no upload: ' + error.message });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleUpdateProfile = async (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setMsg(null);
+    setErrorMsg(null);
+    setSuccessMsg(null);
 
     try {
-      const updates = {
-        id: session.user.id,
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        updated_at: new Date(),
-      };
-
-      const { error } = await supabase.from('profiles').upsert(updates);
-      if (error) throw error;
-
-      await supabase.auth.updateUser({ data: { full_name: fullName } });
-
-      if (newPassword) {
-        const { error: pwError } = await supabase.auth.updateUser({ password: newPassword });
-        if (pwError) throw pwError;
-        setNewPassword('');
+      let result;
+      if (isSignUp) {
+        result = await supabase.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName } }
+        });
+      } else {
+        result = await supabase.auth.signInWithPassword({ email, password });
       }
 
-      setMsg({ type: 'success', text: 'Perfil salvo com sucesso!' });
+      if (result.error) {
+        if (result.error.message.includes("Invalid login")) {
+          throw new Error("Email ou senha incorretos.");
+        } else if (result.error.message.includes("User already registered")) {
+          throw new Error("Este email já está cadastrado.");
+        } else {
+          throw new Error(result.error.message);
+        }
+      } 
+      
+      if (isSignUp && !result.error) {
+        if (result.data?.user?.identities?.length === 0) {
+            throw new Error("Este email já existe.");
+        }
+        alert("Cadastro realizado! Faça login.");
+        setIsSignUp(false);
+      }
+
     } catch (error) {
-      setMsg({ type: 'error', text: error.message });
+      setErrorMsg(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- LOGOUT BLINDADO (CORREÇÃO) ---
-  const handleLogout = async () => {
-    setLoggingOut(true); // Trava o botão e mostra "Saindo..."
+  // --- NOVA FUNÇÃO: RECUPERAÇÃO DE SENHA ---
+  const handleRecovery = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
     try {
-        // Tenta avisar o servidor que saiu (pode falhar se a net cair, mas ok)
-        await supabase.auth.signOut();
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + '/profile', // Redireciona para o Perfil para trocar a senha
+        });
+
+        if (error) throw error;
+
+        setSuccessMsg("E-mail de recuperação enviado! Verifique sua caixa de entrada (e spam).");
+        setEmail(''); // Limpa o campo
     } catch (error) {
-        console.error("Erro ao tentar deslogar no servidor:", error);
+        setErrorMsg("Erro ao enviar e-mail: " + error.message);
     } finally {
-        // OBRIGATÓRIO: Limpa a memória do navegador na força bruta
-        localStorage.clear(); // Limpa tokens persistentes
-        sessionStorage.clear(); // Limpa sessão da aba
-        
-        // Redirecionamento forçado (Recarrega a página para limpar estados do React)
-        window.location.href = '/'; 
+        setLoading(false);
     }
   };
 
-  // Função para copiar o ID
-  const copyUserId = () => {
-    navigator.clipboard.writeText(session.user.id);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleSocialLogin = async (provider) => {
+    setLoading(true);
+    setErrorMsg(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: provider,
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) {
+        setErrorMsg("Erro ao conectar com " + provider);
+    }
+    setLoading(false);
   };
 
   return (
-    <div className="container">
-      {/* HEADER */}
-      <header style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 30}}>
-        <button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%'}} onClick={() => navigate('/app')}>
-          <ArrowLeft size={20}/>
-        </button>
-        <h2 style={{margin: 0}}>Meu Perfil</h2>
-      </header>
-
-      {/* ÁREA DE ID PARA COMPARTILHAR */}
-      <div style={{background: '#F1F5F9', padding: 15, borderRadius: 12, marginBottom: 20, border: '1px dashed #94A3B8'}}>
-        <small style={{display: 'block', color: '#64748B', marginBottom: 5, fontWeight: 'bold'}}>SEU ID DE AMIGO</small>
-        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10}}>
-            <code style={{fontSize: '0.8rem', wordBreak: 'break-all', background: '#fff', padding: 5, borderRadius: 4, flex: 1, color: '#334155'}}>{session.user.id}</code>
-            <button onClick={copyUserId} style={{width: 'auto', padding: 8, fontSize: '0.8rem', background: copied ? '#22c55e' : '#334155', color: '#fff', border: 'none', borderRadius: 6}}>
-                {copied ? <Check size={16}/> : <Copy size={16}/>}
-            </button>
-        </div>
-        <small style={{display: 'block', color: '#94a3b8', marginTop: 5, fontSize: '0.75rem'}}>Envie este código para seus amigos te adicionarem.</small>
-      </div>
-
-      {/* ÁREA DE EDIÇÃO */}
-      <div className="mission-card" style={{marginTop: 0, padding: 24}}>
-        <div className="center mb-4" style={{position: 'relative'}}>
-          <div style={{
-            width: 100, height: 100, borderRadius: '50%', 
-            background: '#E2E8F0', margin: '0 auto 15px', 
-            overflow: 'hidden', border: '4px solid #fff',
-            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-          }}>
-             {avatarUrl ? (
-               <img src={avatarUrl} alt="Avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-             ) : (
-               <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8'}}>
-                 <Camera size={32} />
-               </div>
-             )}
-          </div>
-          
-          <div style={{position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)'}}>
-            <label htmlFor="single" style={{
-              cursor: 'pointer',
-              background: '#334155', color: 'white',
-              padding: '6px 14px', borderRadius: 20,
-              fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-            }}>
-              {uploading ? 'Enviando...' : <><Camera size={14}/> Alterar Foto</>}
-            </label>
-            <input
-              style={{visibility: 'hidden', position: 'absolute'}}
-              type="file"
-              id="single"
-              accept="image/*"
-              onChange={uploadAvatar}
-              disabled={uploading}
-            />
-          </div>
-        </div>
-
-        <form onSubmit={handleUpdateProfile} style={{marginTop: 25}}>
-          <label style={{display: 'block', textAlign: 'left', marginBottom: 5, fontSize: '0.9rem', color: '#64748B'}}>Seu Nome</label>
-          <input 
-            type="text" 
-            value={fullName} 
-            onChange={e => setFullName(e.target.value)} 
-            placeholder="Como quer ser chamado?"
-          />
-
-          <label style={{display: 'block', textAlign: 'left', marginBottom: 5, fontSize: '0.9rem', color: '#64748B'}}>Nova Senha</label>
-          <div style={{position: 'relative'}}>
-            <input 
-              type="password" 
-              value={newPassword} 
-              onChange={e => setNewPassword(e.target.value)} 
-              placeholder="Digite apenas se quiser mudar"
-              style={{paddingRight: 40}}
-            />
-            <Lock size={16} style={{position: 'absolute', right: 12, top: 18, color: '#94a3b8'}}/>
-          </div>
-
-          {msg && (
-            <div style={{
-              padding: 12, borderRadius: 8, marginBottom: 15, fontSize: '0.9rem',
-              background: msg.type === 'success' ? '#dcfce7' : '#fee2e2',
-              color: msg.type === 'success' ? '#166534' : '#991b1b',
-              textAlign: 'center'
-            }}>
-              {msg.text}
-            </div>
-          )}
-
-          <button type="submit" disabled={loading} style={{display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8}}>
-            <Save size={18}/> {loading ? 'Salvando...' : 'Salvar Dados'}
-          </button>
-        </form>
-      </div>
-
-      {/* HISTÓRICO */}
-      <h3 style={{marginTop: 30, display: 'flex', alignItems: 'center', gap: 8}}>
-        <History size={20} color="#7C3AED"/> Sua Jornada
-      </h3>
+    <div className="container" style={{justifyContent: 'center', textAlign: 'center'}}>
       
-      <div style={{flex: 1, overflowY: 'auto', paddingBottom: 20}}>
-        {history.length === 0 ? (
-          <p className="center" style={{marginTop: 20, fontStyle: 'italic', color: '#94a3b8'}}>Nenhuma missão concluída ainda.</p>
-        ) : (
-          history.map(item => (
-            <div key={item.id} style={{
-              background: '#fff', padding: 16, borderRadius: 12, marginBottom: 12,
-              border: '1px solid #E2E8F0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-            }}>
-              <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 6}}>
-                <strong style={{color: '#7C3AED'}}>{item.missions?.title}</strong>
-                <span className="status-badge" style={{margin: 0, fontSize: '0.65rem', padding: '2px 8px'}}>
-                  {item.missions?.attribute}
-                </span>
-              </div>
-              <p style={{margin: 0, fontSize: '0.85rem', color: '#4B5563'}}>"{item.ai_feedback}"</p>
-              <small style={{display: 'block', marginTop: 8, color: '#94a3b8', fontSize: '0.7rem'}}>
-                {new Date(item.created_at).toLocaleDateString('pt-BR')}
-              </small>
-            </div>
-          ))
+      <div className="center mb-4" style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+        
+        {/* --- LOGO DO APP --- */}
+        <img 
+            src="/logo.png" 
+            alt="Logo Tryly" 
+            style={{
+                width: '100px',
+                height: 'auto', 
+                marginBottom: '15px',
+                borderRadius: '12px'
+            }} 
+        />
+
+        <p style={{fontSize: '1rem', color: '#1e293b', fontWeight: '600', marginBottom: 5}}>
+          {isRecovery ? 'Recuperar Acesso' : 'Um passo real por dia.'}
+        </p>
+        
+        {isRecovery && (
+            <p style={{fontSize: '0.85rem', color: '#64748B', maxWidth: '300px'}}>
+                Digite seu e-mail para receber um link de definição de nova senha.
+            </p>
         )}
       </div>
 
-      <button 
-        onClick={handleLogout} 
-        disabled={loggingOut}
-        className="outline" 
-        style={{marginTop: 'auto', borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8}}
-      >
-        <LogOut size={18} />
-        {loggingOut ? 'Saindo...' : 'Sair da Conta'}
-      </button>
+      {/* --- FORMULÁRIO (Alterna entre Login e Recovery) --- */}
+      <form onSubmit={isRecovery ? handleRecovery : handleAuth} style={{marginTop: 20}}>
+        
+        {/* CARD DE ERRO */}
+        {errorMsg && (
+            <div style={{
+                background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', 
+                padding: '12px', borderRadius: 8, marginBottom: 15, fontSize: '0.9rem',
+                display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left'
+            }}>
+                <AlertCircle size={20} style={{minWidth: 20}} />
+                <span>{errorMsg}</span>
+            </div>
+        )}
+
+        {/* CARD DE SUCESSO (Recuperação) */}
+        {successMsg && (
+            <div style={{
+                background: '#DCFCE7', border: '1px solid #86EFAC', color: '#166534', 
+                padding: '12px', borderRadius: 8, marginBottom: 15, fontSize: '0.9rem',
+                textAlign: 'left'
+            }}>
+                <span>{successMsg}</span>
+            </div>
+        )}
+
+        {isSignUp && !isRecovery && (
+          <input 
+            type="text" placeholder="Seu Nome de Herói" required
+            value={fullName} onChange={e => setFullName(e.target.value)}
+          />
+        )}
+        
+        <input 
+          type="email" placeholder="Email" required
+          value={email} onChange={e => setEmail(e.target.value)}
+        />
+        
+        {!isRecovery && (
+            <input 
+            type="password" placeholder="Senha" required
+            value={password} onChange={e => setPassword(e.target.value)}
+            />
+        )}
+
+        <button type="submit" disabled={loading} style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8}}>
+          {loading ? 'Processando...' : (
+              isRecovery ? <><Mail size={18}/> Enviar Link</> : 
+              (isSignUp ? 'Aceitar o Desafio' : 'Entrar na Conta')
+          )}
+        </button>
+      </form>
+
+      {/* --- BOTÕES AUXILIARES --- */}
+      
+      {/* Botão Voltar (Aparece só na recuperação) */}
+      {isRecovery ? (
+          <div className="center mt-4">
+            <button 
+                className="outline" 
+                style={{border: 'none', color: '#64748B', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 5}} 
+                onClick={() => {setIsRecovery(false); setErrorMsg(null); setSuccessMsg(null);}}
+            >
+                <ArrowLeft size={16} /> Voltar para Login
+            </button>
+          </div>
+      ) : (
+          /* Links de Login Normal */
+          <>
+            <div className="center mt-3">
+                <button 
+                    className="outline" 
+                    style={{border: 'none', color: '#64748B', fontSize: '0.85rem', textDecoration: 'underline'}} 
+                    onClick={() => {setIsRecovery(true); setErrorMsg(null); setEmail('');}}
+                >
+                    Esqueci minha senha
+                </button>
+            </div>
+
+            <div style={{display: 'flex', alignItems: 'center', margin: '25px 0', color: '#94a3b8'}}>
+                <div style={{flex: 1, height: 1, background: '#e2e8f0'}}></div>
+                <span style={{padding: '0 10px', fontSize: '0.7rem', fontWeight: 'bold'}}>ACESSO RÁPIDO</span>
+                <div style={{flex: 1, height: 1, background: '#e2e8f0'}}></div>
+            </div>
+
+            <div style={{display: 'flex', gap: '12px', flexDirection: 'column'}}>
+                <button 
+                    type="button" 
+                    onClick={() => handleSocialLogin('google')}
+                    style={{
+                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', 
+                        background: '#fff', color: '#333', border: '1px solid #E2E8F0',
+                        fontWeight: '600', padding: '12px'
+                    }}
+                >
+                    <GoogleIcon /> Continuar com Google
+                </button>
+            </div>
+
+            <div className="center mt-4">
+                <button className="outline" style={{border: 'none', color: '#64748B', fontSize: '0.9rem'}} onClick={() => {setIsSignUp(!isSignUp); setErrorMsg(null);}}>
+                {isSignUp ? 'Já tem conta? Entrar' : 'Criar nova conta'}
+                </button>
+            </div>
+          </>
+      )}
     </div>
   );
 }

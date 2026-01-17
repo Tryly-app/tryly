@@ -13,11 +13,11 @@ export default function Dashboard({ session }) {
   const [currentMission, setCurrentMission] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [activeTrail, setActiveTrail] = useState(null);
-  const [allTrails, setAllTrails] = useState([]); // <--- NOVO: Lista de todas as trilhas
+  const [allTrails, setAllTrails] = useState([]); 
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPro, setIsPro] = useState(false);
   
-  // Popups (PWA, Lembrete, PRO)
+  // Popups
   const [deferredPrompt, setDeferredPrompt] = useState(null); 
   const [showInstallPopup, setShowInstallPopup] = useState(false); 
   const [showReminder, setShowReminder] = useState(false); 
@@ -25,7 +25,7 @@ export default function Dashboard({ session }) {
   const [reminderMessage, setReminderMessage] = useState({ title: '', text: '', action: '' });
   const [isIOS, setIsIOS] = useState(false);
 
-  // Amigos / Ranking
+  // Amigos
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [friendTab, setFriendTab] = useState('ranking');
   const [searchId, setSearchId] = useState('');
@@ -42,7 +42,6 @@ export default function Dashboard({ session }) {
   const firstName = session.user.user_metadata.full_name?.split(' ')[0] || 'Viajante';
 
   useEffect(() => {
-    // PWA Check
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     setIsIOS(ios);
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -66,13 +65,13 @@ export default function Dashboard({ session }) {
 
     let { data: prog } = await supabase.from('user_progress').select('*').eq('user_id', session.user.id).single();
     
-    // Busca TODAS as trilhas para montar o mapa
+    // Busca todas as trilhas e inclui a coluna ai_prompt
     const { data: trailsData } = await supabase.from('trails').select('*').order('position', { ascending: true });
     setAllTrails(trailsData || []);
 
     let trailId = prog?.trail_id;
     if (!trailId && trailsData?.length > 0) {
-        trailId = trailsData[0].id; // Pega a primeira se não tiver
+        trailId = trailsData[0].id;
     }
 
     if (trailId) {
@@ -114,21 +113,16 @@ export default function Dashboard({ session }) {
       }
   };
 
-  // --- LÓGICA DE RANKING (COM XP E VOCÊ INCLUÍDO) ---
+  // Ranking
   const fetchFriendsData = async () => {
       setFriendMsg('');
-      
       const { data: friendships } = await supabase.from('friendships').select('*').eq('status', 'accepted').or(`user_id.eq.${session.user.id},friend_id.eq.${session.user.id}`);
       let allIds = friendships?.map(f => f.user_id === session.user.id ? f.friend_id : f.user_id) || [];
-      
-      if (!allIds.includes(session.user.id)) {
-          allIds.push(session.user.id);
-      }
+      if (!allIds.includes(session.user.id)) allIds.push(session.user.id);
       
       if (allIds.length > 0) {
           const { data: profiles } = await supabase.from('profiles').select('*').in('id', allIds);
           const { data: xpData } = await supabase.from('reflections').select('user_id, missions(attribute)').in('user_id', allIds);
-            
           const ranking = profiles.map(p => {
               const userReflections = xpData.filter(r => r.user_id === p.id && r.missions);
               const totalXp = userReflections.reduce((acc, curr) => {
@@ -137,7 +131,6 @@ export default function Dashboard({ session }) {
               }, 0);
               return { ...p, totalXp };
           });
-
           ranking.sort((a, b) => b.totalXp - a.totalXp);
           setFriendsList(ranking);
       } else { setFriendsList([]); }
@@ -172,13 +165,23 @@ export default function Dashboard({ session }) {
   const submitReflection = async () => {
     if (reflectionText.length < 10) return alert("Escreva um pouco mais.");
     setLoading(true);
-    const feedback = await processReflection(reflectionText, `${currentMission.attribute} XP`, currentMission.badge_name);
+    
+    // --- MÁGICA AQUI: Passamos o prompt personalizado da trilha ativa ---
+    const feedback = await processReflection(
+        reflectionText, 
+        `${currentMission.attribute} XP`, 
+        currentMission.badge_name,
+        activeTrail?.ai_prompt // <--- Novo parâmetro
+    );
+    
     setAiResponse(feedback);
     const today = new Date().toISOString().split('T')[0];
     await supabase.from('reflections').insert({ user_id: session.user.id, mission_id: currentMission.id, mission_day: currentMission.day_number, user_text: reflectionText, ai_feedback: feedback });
     await supabase.from('user_progress').update({ last_completed_at: today, status: 'completed', current_day: progress.current_day + 1 }).eq('user_id', session.user.id);
+    
     const { data: nextMission } = await supabase.from('missions').select('id').eq('trail_id', activeTrail.id).eq('day_number', progress.current_day + 1).maybeSingle();
     setLoading(false);
+    
     if (!nextMission) { setView('trail_finished'); } else { setView('feedback'); }
   };
 
@@ -230,7 +233,6 @@ export default function Dashboard({ session }) {
         </div>
       </header>
 
-      {/* BANNER PRO - SÓ APARECE A PARTIR DA 3ª TRILHA */}
       {!isPro && activeTrail?.position >= 2 && (
           <div onClick={handleBuyPro} style={{
               background: 'linear-gradient(90deg, #7C3AED 0%, #C084FC 100%)', color: '#fff', 
@@ -248,7 +250,6 @@ export default function Dashboard({ session }) {
           </div>
       )}
 
-      {/* PROGRESSO E MISSÃO ATUAL */}
       <div style={{marginBottom: 40}}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8}}><div><h3 style={{margin: 0, fontSize: '1.1rem'}}>{activeTrail?.title || 'Carregando...'}</h3><small style={{color: '#64748B'}}>{activeTrail?.description}</small></div><span style={{fontWeight: 'bold', color: '#7C3AED'}}>{percent}%</span></div>
         <div className="progress-container"><div className="progress-fill" style={{width: `${percent}%`}}></div></div>
@@ -263,7 +264,6 @@ export default function Dashboard({ session }) {
         )}
       </div>
 
-      {/* --- NOVO: MAPA DAS TRILHAS (SUA JORNADA) --- */}
       <div style={{marginTop: 40}}>
           <h3 style={{fontSize: '1rem', color: '#64748B', marginBottom: 15, paddingLeft: 5}}>Sua Jornada</h3>
           <div style={{display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 30}}>
@@ -328,7 +328,7 @@ export default function Dashboard({ session }) {
                   <div style={{display: 'flex', borderBottom: '1px solid #e2e8f0'}}>
                       <button onClick={() => setFriendTab('ranking')} style={{flex: 1, borderRadius: 0, background: friendTab === 'ranking' ? '#F3E8FF' : 'transparent', color: friendTab === 'ranking' ? '#7C3AED' : '#64748B', border: 'none', padding: 12, fontSize: '0.9rem'}}>Ranking</button>
                       <button onClick={() => setFriendTab('add')} style={{flex: 1, borderRadius: 0, background: friendTab === 'add' ? '#F3E8FF' : 'transparent', color: friendTab === 'add' ? '#7C3AED' : '#64748B', border: 'none', padding: 12, fontSize: '0.9rem'}}>Adicionar</button>
-                      <button onClick={() => setFriendTab('requests')} style={{flex: 1, borderRadius: 0, background: friendTab === 'requests' ? '#F3E8FF' : 'transparent', color: friendTab === 'requests' ? '#7C3AED' : '#64748B', border: 'none', padding: 12, fontSize: '0.9rem', position: 'relative'}}>Inbox {requestsList.length > 0 && <span style={{position: 'absolute', top: 8, right: 8, width: 8, height: 8, background: 'red', borderRadius: '50%'}}></span>}</button>
+                      <button onClick={() => setFriendTab('requests')} style={{flex: 1, borderRadius: 0, background: friendTab === 'requests' ? '#F3E8FF' : 'transparent', color: friendTab === 'requests' ? '#7C3AED' : '#64748B', border: 'none', padding: 12, fontSize: '0.9rem', position: 'relative'}}>Solicitações {requestsList.length > 0 && <span style={{position: 'absolute', top: 8, right: 8, width: 8, height: 8, background: 'red', borderRadius: '50%'}}></span>}</button>
                   </div>
                   <div style={{padding: 20, overflowY: 'auto', flex: 1}}>
                       {friendTab === 'ranking' && (

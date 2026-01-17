@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical, BrainCircuit } from 'lucide-react';
 
 const Modal = ({ title, onClose, onSave, children }) => (
   <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
@@ -158,7 +158,7 @@ export default function Admin({ session }) {
           </div>
 
           <button style={{marginBottom: 20}} onClick={() => { 
-              setFormData({ title: '', description: '', is_paid: tab === 'paid' }); 
+              setFormData({ title: '', description: '', is_paid: tab === 'paid', ai_prompt: '' }); 
               setEditingItem(null); 
               setShowTrailModal(true); 
           }}>
@@ -181,6 +181,8 @@ export default function Admin({ session }) {
                      <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
                         <strong>{trail.title}</strong>
                         {trail.is_paid && <span style={{fontSize: '0.6rem', background: '#FEF3C7', color: '#D97706', padding: '2px 6px', borderRadius: 4, fontWeight: 'bold'}}>PRO</span>}
+                        {/* Indicador visual se tem prompt customizado */}
+                        {trail.ai_prompt && <BrainCircuit size={14} color="#7C3AED" />}
                      </div>
                      <p style={{margin: 0, fontSize: '0.85rem'}}>{trail.description}</p>
                   </div>
@@ -207,7 +209,6 @@ export default function Admin({ session }) {
                 <div>
                    <span className="status-badge" style={{padding: '2px 8px', fontSize: '0.65rem'}}>Dia {m.day_number}</span>
                    <strong style={{display: 'block', color: '#333'}}>{m.title}</strong>
-                   {/* Agora mostra o XP no admin também */}
                    <span style={{fontSize: '0.8rem', color: '#64748B'}}>{m.attribute} XP {m.badge_name && `• ${m.badge_name}`}</span>
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column', gap: 5}}>
@@ -220,6 +221,7 @@ export default function Admin({ session }) {
         </>
       )}
 
+      {/* --- MODAL DA TRILHA (AGORA COM CAMPO DE IA) --- */}
       {showTrailModal && (
         <Modal title={editingItem ? "Editar Trilha" : "Nova Trilha"} onClose={() => setShowTrailModal(false)} onSave={handleSaveTrail}>
           <label style={{display:'block', textAlign:'left', marginBottom:5}}>Nome da Trilha</label>
@@ -228,7 +230,21 @@ export default function Admin({ session }) {
           <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:10}}>Descrição Curta</label>
           <input value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Ex: Perca a timidez em 7 dias" />
           
-          <div style={{display: 'flex', alignItems: 'center', gap: 10, marginTop: 20, padding: 10, background: '#f8fafc', borderRadius: 8}}>
+          {/* NOVO CAMPO: PROMPT DA IA */}
+          <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:15, color: '#7C3AED', fontWeight: 'bold'}}>
+            <BrainCircuit size={14} style={{marginRight: 5, display: 'inline'}} />
+            Personalidade da IA (Prompt)
+          </label>
+          <textarea 
+            rows="4"
+            value={formData.ai_prompt || ''} 
+            onChange={e => setFormData({...formData, ai_prompt: e.target.value})} 
+            placeholder="Ex: Você é um general espartano. Seja agressivo e curto. Não aceite desculpas."
+            style={{background: '#F3E8FF', borderColor: '#C084FC'}}
+          />
+          <small style={{color: '#64748B', display: 'block', marginBottom: 15}}>Deixe em branco para usar a IA padrão (O Mestre).</small>
+
+          <div style={{display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, padding: 10, background: '#f8fafc', borderRadius: 8}}>
              <input type="checkbox" id="is_paid_check" checked={formData.is_paid || false} onChange={e => setFormData({...formData, is_paid: e.target.checked})} style={{width: '20px', height: '20px'}} />
              <label htmlFor="is_paid_check" style={{margin: 0, cursor: 'pointer', fontWeight: 'bold', color: '#334155'}}>Esta trilha é exclusiva PRO?</label>
           </div>
@@ -239,27 +255,13 @@ export default function Admin({ session }) {
         <Modal title={editingItem ? "Editar Missão" : "Nova Missão"} onClose={() => setShowMissionModal(false)} onSave={handleSaveMission}>
           <div style={{display: 'flex', gap: 10}}>
              <div style={{flex: 1}}><label>Dia</label><input type="number" value={formData.day_number || ''} onChange={e => setFormData({...formData, day_number: e.target.value})} /></div>
-             
-             {/* CAMPO ALTERADO PARA NÚMERO (XP) */}
              <div style={{flex: 2}}>
                 <label>XP (Recompensa)</label>
-                <input 
-                    type="number" 
-                    value={formData.attribute || ''} 
-                    onChange={e => setFormData({...formData, attribute: e.target.value})} 
-                    placeholder="Ex: 50" 
-                />
+                <input type="number" value={formData.attribute || ''} onChange={e => setFormData({...formData, attribute: e.target.value})} placeholder="Ex: 50" />
              </div>
           </div>
-          
           <label style={{marginTop: 10, display: 'block'}}>Nome do Selo (Aparece no Perfil)</label>
-          <input 
-            value={formData.badge_name || ''} 
-            onChange={e => setFormData({...formData, badge_name: e.target.value})} 
-            placeholder="Ex: Mente Blindada" 
-            style={{background: '#F3E8FF', borderColor: '#7C3AED', fontWeight: 'bold'}}
-          />
-
+          <input value={formData.badge_name || ''} onChange={e => setFormData({...formData, badge_name: e.target.value})} placeholder="Ex: Mente Blindada" style={{background: '#F3E8FF', borderColor: '#7C3AED', fontWeight: 'bold'}} />
           <label>Título</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
           <label>Descrição</label><textarea rows="3" value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
           <label>Ação (Botão)</label><input value={formData.action_text || ''} onChange={e => setFormData({...formData, action_text: e.target.value})} placeholder="Ex: Feito!" />
