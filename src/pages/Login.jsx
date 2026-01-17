@@ -236,6 +236,22 @@ export default function Login() {
             </div>
           </>
       )}
+
+      {/* --- SEO FOOTER (Para o Google indexar o conteúdo) --- */}
+      <footer style={{marginTop: 50, padding: 20, borderTop: '1px solid #E2E8F0', color: '#64748B', fontSize: '0.8rem', maxWidth: 600}}>
+        <h3 style={{fontSize: '1rem', color: '#334155', marginBottom: 10}}>O que é o Tryly?</h3>
+        <p style={{marginBottom: 10}}>
+          O Tryly é a primeira plataforma de <strong>desenvolvimento pessoal gamificado</strong> focada 100% em ação. 
+          Ao contrário de cursos tradicionais, aqui você ganha <strong>XP (Experiência)</strong> completando missões na vida real.
+        </p>
+        <p style={{marginBottom: 10}}>
+          Supere a procrastinação, suba no <strong>ranking entre amigos</strong> e conquiste selos de habilidade. 
+          Junte-se a uma comunidade de fundadores e protagonistas que buscam evolução constante.
+        </p>
+        <p style={{marginTop: 20, opacity: 0.8}}>
+          © 2026 Tryly App. Todos os direitos reservados.
+        </p>
+      </footer>
     </div>
   );
 }
