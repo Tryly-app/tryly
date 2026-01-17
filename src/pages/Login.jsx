@@ -158,7 +158,7 @@ export default function Login() {
 
         {isSignUp && !isRecovery && (
           <input 
-            type="text" placeholder="Seu Nome de Herói" required
+            type="text" placeholder="Seu Nome" required
             value={fullName} onChange={e => setFullName(e.target.value)}
           />
         )}
