@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { AlertCircle, ArrowLeft, Mail } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Mail, Rocket } from 'lucide-react';
 
-// Ícone do Google 
+// Ícone do Google (Mantido)
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -21,6 +21,11 @@ export default function Login() {
   const [fullName, setFullName] = useState('');
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null); 
+
+  // Atualiza título da aba dinamicamente
+  useEffect(() => {
+    document.title = "Tryly | Treino comportamental para ação e decisão real.";
+  }, []);
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -64,7 +69,6 @@ export default function Login() {
     }
   };
 
-  // --- NOVA FUNÇÃO: RECUPERAÇÃO DE SENHA ---
   const handleRecovery = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -73,12 +77,11 @@ export default function Login() {
 
     try {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + '/profile', // Redireciona para o Perfil para trocar a senha
+            redirectTo: window.location.origin + '/profile',
         });
 
         if (error) throw error;
-
-        setSuccessMsg("E-mail de recuperação enviado! Verifique sua caixa de entrada (e spam).");
+        setSuccessMsg("E-mail de recuperação enviado! Verifique sua caixa de entrada.");
         setEmail(''); 
     } catch (error) {
         setErrorMsg("Erro ao enviar e-mail: " + error.message);
@@ -92,166 +95,138 @@ export default function Login() {
     setErrorMsg(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: provider,
-      options: {
-        redirectTo: window.location.origin
-      }
+      options: { redirectTo: window.location.origin }
     });
-    if (error) {
-        setErrorMsg("Erro ao conectar com " + provider);
-    }
+    if (error) setErrorMsg("Erro ao conectar com " + provider);
     setLoading(false);
   };
 
   return (
-    <div className="container" style={{justifyContent: 'center', textAlign: 'center'}}>
+    <div style={{display: 'flex', minHeight: '100vh', flexDirection: 'row', flexWrap: 'wrap'}}>
       
-      <div className="center mb-4" style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-        
-        {/* --- LOGO DO APP --- */}
-        <img 
-            src="/logo.png" 
-            alt="Logo Tryly" 
-            style={{
-                width: '100px',
-                height: 'auto', 
-                marginBottom: '15px',
-                borderRadius: '12px'
-            }} 
-        />
+      {/* --- COLUNA ESQUERDA: CONCEITO (NOVO TEXTO) --- */}
+      <div style={{
+          flex: '1 1 500px', 
+          background: 'linear-gradient(135deg, #4C1D95 0%, #7C3AED 100%)', 
+          padding: '60px 40px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'center',
+          color: '#fff',
+          position: 'relative'
+      }}>
+          <div style={{maxWidth: 600, margin: '0 auto'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 30}}>
+                <div style={{background: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: 12}}>
+                    <Rocket size={28} color="#fff" />
+                </div>
+                <span style={{fontSize: '1.5rem', fontWeight: 'bold', letterSpacing: '-1px'}}>tryly</span>
+             </div>
 
-        <p style={{fontSize: '1rem', color: '#1e293b', fontWeight: '600', marginBottom: 5}}>
-          {isRecovery ? 'Recuperar Acesso' : 'Um passo real por dia.'}
-        </p>
-        
-        {isRecovery && (
-            <p style={{fontSize: '0.85rem', color: '#64748B', maxWidth: '300px'}}>
-                Digite seu e-mail para receber um link de definição de nova senha.
-            </p>
-        )}
+             <h1 style={{fontSize: '2.8rem', lineHeight: '1.1', fontWeight: '800', marginBottom: 25}}>
+                O Tryly é um sistema de treino comportamental.
+             </h1>
+             
+             <p style={{fontSize: '1.2rem', color: '#E9D5FF', lineHeight: '1.6', marginBottom: 30}}>
+                Aqui você age, lê a realidade e constrói decisões que sustentam no dia a dia.
+             </p>
+
+             <div style={{borderLeft: '4px solid #fff', paddingLeft: 20}}>
+                 <p style={{fontSize: '1.4rem', fontWeight: 'bold', margin: 0, opacity: 0.9}}>Não é motivação.</p>
+                 <p style={{fontSize: '1.4rem', fontWeight: 'bold', color: '#fff', margin: 0}}>É prática.</p>
+             </div>
+          </div>
       </div>
 
-      {/* --- FORMULÁRIO (Alterna entre Login e Recovery) --- */}
-      <form onSubmit={isRecovery ? handleRecovery : handleAuth} style={{marginTop: 20}}>
-        
-        {/* CARD DE ERRO */}
-        {errorMsg && (
-            <div style={{
-                background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', 
-                padding: '12px', borderRadius: 8, marginBottom: 15, fontSize: '0.9rem',
-                display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left'
-            }}>
-                <AlertCircle size={20} style={{minWidth: 20}} />
-                <span>{errorMsg}</span>
+      {/* --- COLUNA DIREITA: FORMULÁRIO (LÓGICA MANTIDA) --- */}
+      <div style={{
+          flex: '1 1 450px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          padding: '40px',
+          background: '#F8FAFC'
+      }}>
+        <div style={{width: '100%', maxWidth: '400px'}}>
+            
+            <div style={{textAlign: 'center', marginBottom: 30}}>
+                <img src="/logo.png" alt="Logo" style={{width: 60, borderRadius: 10, marginBottom: 15}} />
+                <h2 style={{fontSize: '1.5rem', color: '#1e293b', marginBottom: 5}}>
+                    {isRecovery ? 'Recuperar Acesso' : (isSignUp ? 'Crie sua conta' : 'Acesse a plataforma')}
+                </h2>
+                <p style={{color: '#64748B'}}>
+                    {isRecovery ? 'Enviaremos um link para você.' : 'Continue sua evolução.'}
+                </p>
             </div>
-        )}
 
-        {/* CARD DE SUCESSO (Recuperação) */}
-        {successMsg && (
-            <div style={{
-                background: '#DCFCE7', border: '1px solid #86EFAC', color: '#166534', 
-                padding: '12px', borderRadius: 8, marginBottom: 15, fontSize: '0.9rem',
-                textAlign: 'left'
-            }}>
-                <span>{successMsg}</span>
-            </div>
-        )}
+            {/* FORMULÁRIO */}
+            <form onSubmit={isRecovery ? handleRecovery : handleAuth}>
+                
+                {errorMsg && (
+                    <div style={{background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '12px', borderRadius: 8, marginBottom: 15, fontSize: '0.9rem', display: 'flex', gap: 10}}>
+                        <AlertCircle size={20} /> <span>{errorMsg}</span>
+                    </div>
+                )}
+                
+                {successMsg && (
+                    <div style={{background: '#DCFCE7', border: '1px solid #86EFAC', color: '#166534', padding: '12px', borderRadius: 8, marginBottom: 15}}>
+                        {successMsg}
+                    </div>
+                )}
 
-        {isSignUp && !isRecovery && (
-          <input 
-            type="text" placeholder="Seu Nome" required
-            value={fullName} onChange={e => setFullName(e.target.value)}
-          />
-        )}
-        
-        <input 
-          type="email" placeholder="Email" required
-          value={email} onChange={e => setEmail(e.target.value)}
-        />
-        
-        {!isRecovery && (
-            <input 
-            type="password" placeholder="Senha" required
-            value={password} onChange={e => setPassword(e.target.value)}
-            />
-        )}
+                {isSignUp && !isRecovery && (
+                <div style={{marginBottom: 15}}>
+                    <input type="text" placeholder="Seu Nome" required value={fullName} onChange={e => setFullName(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1'}} />
+                </div>
+                )}
+                
+                <div style={{marginBottom: 15}}>
+                    <input type="email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1'}} />
+                </div>
+                
+                {!isRecovery && (
+                    <div style={{marginBottom: 15}}>
+                        <input type="password" placeholder="Senha" required value={password} onChange={e => setPassword(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1'}} />
+                    </div>
+                )}
 
-        <button type="submit" disabled={loading} style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8}}>
-          {loading ? 'Processando...' : (
-              isRecovery ? <><Mail size={18}/> Enviar Link</> : 
-              (isSignUp ? 'Aceitar o Desafio' : 'Entrar na Conta')
-          )}
-        </button>
-      </form>
-
-      {/* --- BOTÕES AUXILIARES --- */}
-      
-      {/* Botão Voltar (Aparece só na recuperação) */}
-      {isRecovery ? (
-          <div className="center mt-4">
-            <button 
-                className="outline" 
-                style={{border: 'none', color: '#64748B', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 5}} 
-                onClick={() => {setIsRecovery(false); setErrorMsg(null); setSuccessMsg(null);}}
-            >
-                <ArrowLeft size={16} /> Voltar para Login
-            </button>
-          </div>
-      ) : (
-          /* Links de Login Normal */
-          <>
-            <div className="center mt-3">
-                <button 
-                    className="outline" 
-                    style={{border: 'none', color: '#64748B', fontSize: '0.85rem', textDecoration: 'underline'}} 
-                    onClick={() => {setIsRecovery(true); setErrorMsg(null); setEmail('');}}
-                >
-                    Esqueci minha senha
+                <button type="submit" disabled={loading} style={{width: '100%', padding: 12, background: '#7C3AED', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', opacity: loading ? 0.7 : 1}}>
+                {loading ? 'Processando...' : (isRecovery ? 'Enviar Link' : (isSignUp ? 'Cadastrar' : 'Entrar'))}
                 </button>
-            </div>
+            </form>
 
-            <div style={{display: 'flex', alignItems: 'center', margin: '25px 0', color: '#94a3b8'}}>
-                <div style={{flex: 1, height: 1, background: '#e2e8f0'}}></div>
-                <span style={{padding: '0 10px', fontSize: '0.7rem', fontWeight: 'bold'}}>ACESSO RÁPIDO</span>
-                <div style={{flex: 1, height: 1, background: '#e2e8f0'}}></div>
-            </div>
+            {/* BOTÕES EXTRAS (Google, Trocar modo) */}
+            {!isRecovery && (
+                <>
+                    <div style={{display: 'flex', alignItems: 'center', margin: '20px 0', color: '#94a3b8'}}>
+                        <div style={{flex: 1, height: 1, background: '#e2e8f0'}}></div>
+                        <span style={{padding: '0 10px', fontSize: '0.7rem'}}>OU</span>
+                        <div style={{flex: 1, height: 1, background: '#e2e8f0'}}></div>
+                    </div>
 
-            <div style={{display: 'flex', gap: '12px', flexDirection: 'column'}}>
-                <button 
-                    type="button" 
-                    onClick={() => handleSocialLogin('google')}
-                    style={{
-                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', 
-                        background: '#fff', color: '#333', border: '1px solid #E2E8F0',
-                        fontWeight: '600', padding: '12px'
-                    }}
-                >
-                    <GoogleIcon /> Continuar com Google
-                </button>
-            </div>
+                    <button type="button" onClick={() => handleSocialLogin('google')} style={{width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', background: '#fff', color: '#333', border: '1px solid #E2E8F0', fontWeight: '600', padding: '12px', borderRadius: 8, cursor: 'pointer'}}>
+                        <GoogleIcon /> Google
+                    </button>
+                </>
+            )}
 
-            <div className="center mt-4">
-                <button className="outline" style={{border: 'none', color: '#64748B', fontSize: '0.9rem'}} onClick={() => {setIsSignUp(!isSignUp); setErrorMsg(null);}}>
-                {isSignUp ? 'Já tem conta? Entrar' : 'Criar nova conta'}
-                </button>
+            <div style={{marginTop: 20, textAlign: 'center', fontSize: '0.9rem'}}>
+                {isRecovery ? (
+                     <button onClick={() => {setIsRecovery(false); setErrorMsg(null);}} style={{background: 'transparent', border: 'none', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, width: '100%', cursor: 'pointer'}}>
+                        <ArrowLeft size={16} /> Voltar
+                     </button>
+                ) : (
+                    <>
+                        <button onClick={() => {setIsRecovery(true); setErrorMsg(null);}} style={{background: 'transparent', border: 'none', color: '#64748B', textDecoration: 'underline', cursor: 'pointer', marginBottom: 10}}>Esqueci a senha</button>
+                        <br/>
+                        <button onClick={() => {setIsSignUp(!isSignUp); setErrorMsg(null);}} style={{background: 'transparent', border: 'none', color: '#7C3AED', fontWeight: 'bold', cursor: 'pointer'}}>
+                            {isSignUp ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastre-se'}
+                        </button>
+                    </>
+                )}
             </div>
-          </>
-      )}
-
-      {/* --- SEO FOOTER (Para o Google indexar o conteúdo) --- */}
-      <footer style={{marginTop: 50, padding: 20, borderTop: '1px solid #E2E8F0', color: '#64748B', fontSize: '0.8rem', maxWidth: 600}}>
-        <h3 style={{fontSize: '1rem', color: '#334155', marginBottom: 10}}>O que é o Tryly?</h3>
-        <p style={{marginBottom: 10}}>
-          O Tryly é a primeira plataforma de <strong>desenvolvimento pessoal gamificado</strong> focada 100% em ação. 
-          Ao contrário de cursos tradicionais, aqui você ganha <strong>XP (Experiência)</strong> completando missões na vida real.
-        </p>
-        <p style={{marginBottom: 10}}>
-          Supere a procrastinação, suba no <strong>ranking entre amigos</strong> e conquiste selos de habilidade. 
-          Junte-se a uma comunidade de fundadores e protagonistas que buscam evolução constante.
-        </p>
-        <p style={{marginTop: 20, opacity: 0.8}}>
-          © 2026 Tryly App. Todos os direitos reservados.
-        </p>
-      </footer>
+        </div>
+      </div>
     </div>
   );
 }
