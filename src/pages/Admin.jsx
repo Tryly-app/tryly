@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical, BrainCircuit, Users, RefreshCcw, LayoutList, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical, BrainCircuit, Users, RefreshCcw, LayoutList, AlertTriangle, AlertCircle } from 'lucide-react';
 
-// --- COMPONENTE MODAL ATUALIZADO (Aceita cor e texto do botão) ---
+// --- COMPONENTE MODAL FLEXÍVEL (Aceita cor, ícone e validação) ---
 const Modal = ({ title, onClose, onSave, children, saveLabel = "Salvar", saveColor = "#7C3AED", disableSave = false }) => (
   <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
     <div className="mission-card" style={{width: '90%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', padding: 25, background: 'white', borderRadius: 16}}>
@@ -26,7 +26,8 @@ const Modal = ({ title, onClose, onSave, children, saveLabel = "Salvar", saveCol
                 background: disableSave ? '#E2E8F0' : saveColor, 
                 borderColor: disableSave ? '#E2E8F0' : saveColor,
                 color: disableSave ? '#94A3B8' : 'white',
-                cursor: disableSave ? 'not-allowed' : 'pointer'
+                cursor: disableSave ? 'not-allowed' : 'pointer',
+                opacity: disableSave ? 0.7 : 1
             }}
         >
             {saveLabel}
@@ -41,12 +42,13 @@ export default function Admin({ session }) {
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('list'); 
   
-  // Trilhas
+  // Dados
   const [trails, setTrails] = useState([]);
   const [selectedTrail, setSelectedTrail] = useState(null);
   const [missions, setMissions] = useState([]);
+  const [usersList, setUsersList] = useState([]);
   
-  // Modais e Edição
+  // Estados de Edição e Drag&Drop
   const [showTrailModal, setShowTrailModal] = useState(false);
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -54,13 +56,14 @@ export default function Admin({ session }) {
   const [tab, setTab] = useState('free');
   const [draggedItem, setDraggedItem] = useState(null);
 
-  // --- NOVO: ESTADOS PARA O MODAL DE DELETAR ---
+  // --- ESTADOS PARA OS MODAIS DE AÇÃO (DELETAR E ZERAR) ---
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
-  // Usuários
-  const [usersList, setUsersList] = useState([]);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [userToReset, setUserToReset] = useState(null);
+  const [resetConfirmationText, setResetConfirmationText] = useState('');
 
   useEffect(() => {
     checkAdminAndFetch();
@@ -98,7 +101,7 @@ export default function Admin({ session }) {
     setLoading(false);
   };
 
-  // --- LÓGICA DE ARRASTAR (Drag & Drop) ---
+  // --- DRAG AND DROP ---
   const handleDragStart = (e, index) => setDraggedItem(index);
   const handleDragOver = (e) => e.preventDefault();
 
@@ -119,7 +122,7 @@ export default function Admin({ session }) {
     fetchTrails();
   };
 
-  // --- CRUD TRILHAS ---
+  // --- CRUD TRILHAS E MISSÕES (Mantido igual) ---
   const handleSaveTrail = async () => {
     if (!formData.title) return alert("Título obrigatório");
     const isPaid = formData.is_paid === true; 
@@ -148,7 +151,6 @@ export default function Admin({ session }) {
     }
   };
 
-  // --- CRUD MISSÕES ---
   const handleSaveMission = async () => {
     if (!formData.title || !formData.day_number) return alert("Dados incompletos");
     const payload = { ...formData, trail_id: selectedTrail.id };
@@ -176,28 +178,30 @@ export default function Admin({ session }) {
     }
   };
 
-  // --- LÓGICA DE DELETAR USUÁRIO (NOVA) ---
+  // --- FUNÇÕES DE USUÁRIO (NOVAS) ---
   
-  // 1. Abre o Modal
+  // 1. ABRIR MODAIS
   const openDeleteUserModal = (user) => {
     setUserToDelete(user);
     setDeleteConfirmationText('');
     setShowDeleteModal(true);
   };
 
-  // 2. Executa a Deletion
+  const openResetUserModal = (user) => {
+    setUserToReset(user);
+    setResetConfirmationText('');
+    setShowResetModal(true);
+  };
+
+  // 2. EXECUTAR AÇÕES
   const confirmDeleteUser = async () => {
-    if (!userToDelete) return;
-    if (deleteConfirmationText.toUpperCase() !== "DELETAR") return;
+    if (!userToDelete || deleteConfirmationText.toUpperCase() !== "DELETAR") return;
 
     try {
         setLoading(true);
-        // Tenta apagar direto (agora que configuramos o CASCADE no banco)
+        // Graças ao CASCADE no banco, apagar o profile apaga tudo.
         const { error } = await supabase.from('profiles').delete().eq('id', userToDelete.id);
-        
         if (error) throw error;
-
-        // Sucesso
         setShowDeleteModal(false);
         fetchUsers();
     } catch (error) {
@@ -207,20 +211,45 @@ export default function Admin({ session }) {
     }
   };
 
-  const handleResetUser = async (userId, userName) => {
-    if (window.confirm(`Zerar o progresso de ${userName}?`)) {
-        try {
-            setLoading(true);
-            await supabase.from('user_progress').delete().eq('user_id', userId);
-            await supabase.from('reflections').delete().eq('user_id', userId);
-            await supabase.from('profiles').update({ xp: 0, level: 1, current_streak: 0 }).eq('id', userId);
-            alert(`Progresso zerado.`);
-            fetchUsers();
-        } catch (error) {
-            alert("Erro: " + error.message);
-        } finally {
-            setLoading(false);
+ const confirmResetUser = async () => {
+    if (!userToReset || resetConfirmationText.toUpperCase() !== "ZERAR") return;
+    
+    try {
+        setLoading(true);
+
+        // 1. Apaga APENAS o histórico de textos/reflexões (O passado é apagado)
+        await supabase.from('reflections').delete().eq('user_id', userToReset.id);
+        
+        // 2. REINICIA o progresso para o Dia 1 (Mantém a trilha que ele escolheu, mas volta pro início)
+        // Se usar .delete() aqui, ele perde a escolha da trilha. O .update() é melhor.
+        const { error: progressError } = await supabase.from('user_progress').update({
+            current_day: 1,
+            status: 'new',       // Volta status para "novo"
+            last_completed_at: null
+        }).eq('user_id', userToReset.id);
+
+        // Caso o usuário não tenha progresso ainda (edge case), tentamos deletar só pra garantir limpeza
+        if (progressError) {
+             console.log("Usuário sem progresso ativo ou erro, tentando limpeza total...");
+             await supabase.from('user_progress').delete().eq('user_id', userToReset.id);
         }
+
+        // 3. Reseta os atributos do Perfil (XP, Nível, Ofensiva)
+        await supabase.from('profiles').update({ 
+            xp: 0, 
+            level: 1, 
+            current_streak: 0,
+            longest_streak: 0 
+        }).eq('id', userToReset.id);
+
+        setShowResetModal(false);
+        fetchUsers();
+        alert(`O usuário ${userToReset.email} foi reiniciado para o Dia 1.`);
+
+    } catch (error) {
+        alert("Erro ao resetar: " + error.message);
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -242,7 +271,7 @@ export default function Admin({ session }) {
         </div>
       </header>
 
-      {/* --- VISÃO: LISTA DE TRILHAS --- */}
+      {/* --- VISÃO LISTA --- */}
       {view === 'list' && (
         <>
           <div style={{display: 'flex', marginBottom: 20, borderBottom: '1px solid #e2e8f0'}}>
@@ -276,7 +305,7 @@ export default function Admin({ session }) {
         </>
       )}
 
-      {/* --- VISÃO: DETALHES --- */}
+      {/* --- VISÃO DETALHE --- */}
       {view === 'detail' && (
         <>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
@@ -303,7 +332,7 @@ export default function Admin({ session }) {
         </>
       )}
 
-      {/* --- VISÃO: GESTÃO DE USUÁRIOS --- */}
+      {/* --- VISÃO USUÁRIOS --- */}
       {view === 'users' && (
         <div style={{display: 'flex', flexDirection: 'column', gap: 15}}>
             {usersList.map(user => (
@@ -317,10 +346,9 @@ export default function Admin({ session }) {
                         <div style={{marginTop: 8, fontSize: '0.85rem'}}><strong>Lvl {user.level || 1}</strong> • {user.xp || 0} XP</div>
                     </div>
                     <div style={{display: 'flex', gap: 10, width: '100%', borderTop: '1px solid #f1f5f9', paddingTop: 15}}>
-                        <button className="outline" style={{flex: 1, fontSize: '0.9rem'}} onClick={() => handleResetUser(user.id, user.full_name)}>
-                            <RefreshCcw size={16} style={{marginRight: 6}} /> Zerar
+                        <button className="outline" style={{flex: 1, fontSize: '0.9rem'}} onClick={() => openResetUserModal(user)}>
+                            <RefreshCcw size={16} style={{marginRight: 6}} /> Zerar Progresso
                         </button>
-                        {/* BOTÃO QUE ABRE O MODAL NOVO */}
                         <button style={{flex: 1, fontSize: '0.9rem', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5'}} onClick={() => openDeleteUserModal(user)}>
                             <Trash2 size={16} style={{marginRight: 6}} /> Deletar
                         </button>
@@ -330,7 +358,7 @@ export default function Admin({ session }) {
         </div>
       )}
 
-      {/* --- MODAIS DE TRILHA E MISSÃO (Mantidos) --- */}
+      {/* --- MODAIS DE TRILHA E MISSÃO --- */}
       {showTrailModal && (
         <Modal title={editingItem ? "Editar Trilha" : "Nova Trilha"} onClose={() => setShowTrailModal(false)} onSave={handleSaveTrail}>
           <label>Nome</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
@@ -353,13 +381,13 @@ export default function Admin({ session }) {
         </Modal>
       )}
 
-      {/* --- NOVO MODAL DE DELETAR (ESTILIZADO) --- */}
+      {/* --- MODAL DE DELETAR (VERMELHO) --- */}
       {showDeleteModal && (
         <Modal 
-            title="⚠️ Zona de Perigo" 
+            title="⚠️ Exclusão Permanente" 
             onClose={() => setShowDeleteModal(false)} 
             onSave={confirmDeleteUser}
-            saveLabel="Confirmar Exclusão"
+            saveLabel="DELETAR CONTA"
             saveColor="#DC2626"
             disableSave={deleteConfirmationText.toUpperCase() !== "DELETAR"}
         >
@@ -367,36 +395,46 @@ export default function Admin({ session }) {
               <div style={{background: '#FEF2F2', padding: 20, borderRadius: 50, width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'}}>
                 <AlertTriangle size={40} color="#DC2626" />
               </div>
-
-              <p style={{color: '#475569', marginBottom: 20, lineHeight: 1.5}}>
-                 Você está prestes a apagar <strong>PERMANENTEMENTE</strong> todos os dados de:<br/>
-                 <span style={{color: '#7C3AED', fontWeight: 'bold', fontSize: '1.1rem', display: 'block', marginTop: 5}}>{userToDelete?.email}</span>
+              <p style={{color: '#475569', marginBottom: 20}}>
+                 Você vai apagar <strong>TUDO</strong> de:<br/><span style={{color: '#7C3AED', fontWeight: 'bold'}}>{userToDelete?.email}</span>
               </p>
-              
-              <div style={{background: '#FFF1F2', padding: 15, borderRadius: 8, border: '1px solid #FECDD3', marginBottom: 25}}>
-                 <p style={{margin: 0, color: '#BE123C', fontSize: '0.85rem', fontWeight: 'bold'}}>Isso apagará perfil, histórico de missões e XP. Essa ação não pode ser desfeita.</p>
-              </div>
-
-              <label style={{display: 'block', textAlign: 'left', marginBottom: 8, fontSize: '0.9rem', color: '#334155', fontWeight: 'bold'}}>
-                 Para confirmar, digite "DELETAR" abaixo:
-              </label>
+              <label style={{display: 'block', textAlign: 'left', marginBottom: 8, fontSize: '0.8rem', fontWeight: 'bold', color: '#64748B'}}>DIGITE "DELETAR" PARA CONFIRMAR:</label>
               <input 
                  value={deleteConfirmationText} 
                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
                  placeholder="DELETAR"
-                 style={{
-                    width: '100%', 
-                    padding: 12, 
-                    border: deleteConfirmationText.toUpperCase() === 'DELETAR' ? '2px solid #22C55E' : '2px solid #E2E8F0', 
-                    borderRadius: 8,
-                    fontSize: '1rem',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    textTransform: 'uppercase',
-                    letterSpacing: 1,
-                    outline: 'none',
-                    color: '#333'
-                 }}
+                 style={{width: '100%', padding: 12, border: deleteConfirmationText.toUpperCase() === 'DELETAR' ? '2px solid #DC2626' : '1px solid #CBD5E1', textAlign: 'center', fontWeight: 'bold'}}
+              />
+           </div>
+        </Modal>
+      )}
+
+      {/* --- MODAL DE RESET (LARANJA) --- */}
+      {showResetModal && (
+        <Modal 
+            title="🔄 Zerar Progresso" 
+            onClose={() => setShowResetModal(false)} 
+            onSave={confirmResetUser}
+            saveLabel="ZERAR TUDO"
+            saveColor="#D97706" // Laranja
+            disableSave={resetConfirmationText.toUpperCase() !== "ZERAR"}
+        >
+           <div style={{textAlign: 'center'}}>
+              <div style={{background: '#FFFBEB', padding: 20, borderRadius: 50, width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'}}>
+                <AlertCircle size={40} color="#D97706" />
+              </div>
+              <p style={{color: '#475569', marginBottom: 20}}>
+                 Isso vai voltar o Nível para 1 e XP para 0 de:<br/><span style={{color: '#7C3AED', fontWeight: 'bold'}}>{userToReset?.email}</span>
+              </p>
+              <div style={{background: '#FFF7ED', padding: 10, borderRadius: 8, border: '1px solid #FFEDD5', marginBottom: 20, fontSize: '0.85rem', color: '#C2410C'}}>
+                <strong>Atenção:</strong> As conquistas e o histórico de missões serão perdidos para sempre. A conta continuará existindo.
+              </div>
+              <label style={{display: 'block', textAlign: 'left', marginBottom: 8, fontSize: '0.8rem', fontWeight: 'bold', color: '#64748B'}}>DIGITE "ZERAR" PARA CONFIRMAR:</label>
+              <input 
+                 value={resetConfirmationText} 
+                 onChange={(e) => setResetConfirmationText(e.target.value)}
+                 placeholder="ZERAR"
+                 style={{width: '100%', padding: 12, border: resetConfirmationText.toUpperCase() === 'ZERAR' ? '2px solid #D97706' : '1px solid #CBD5E1', textAlign: 'center', fontWeight: 'bold'}}
               />
            </div>
         </Modal>
