@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical, BrainCircuit } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical, BrainCircuit, Users, RefreshCcw, LayoutList } from 'lucide-react';
 
 const Modal = ({ title, onClose, onSave, children }) => (
   <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
@@ -20,17 +20,22 @@ export default function Admin({ session }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   
+  // Views: 'list' (trilhas), 'detail' (missões), 'users' (gestão de usuários)
   const [view, setView] = useState('list'); 
+  
+  // Dados Trilhas
   const [trails, setTrails] = useState([]);
   const [selectedTrail, setSelectedTrail] = useState(null);
   const [missions, setMissions] = useState([]);
-
   const [showTrailModal, setShowTrailModal] = useState(false);
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
-  const [tab, setTab] = useState('free');
+  const [tab, setTab] = useState('free'); // free | paid
   const [draggedItem, setDraggedItem] = useState(null);
+
+  // Dados Usuários
+  const [usersList, setUsersList] = useState([]);
 
   useEffect(() => {
     checkAdminAndFetch();
@@ -60,6 +65,15 @@ export default function Admin({ session }) {
     setLoading(false);
   };
 
+  const fetchUsers = async () => {
+    setLoading(true);
+    // Busca perfis ordenados por criação (mais recentes primeiro)
+    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    setUsersList(data || []);
+    setLoading(false);
+  };
+
+  // --- ARRASTAR E SOLTAR TRILHAS ---
   const handleDragStart = (e, index) => setDraggedItem(index);
   const handleDragOver = (e) => e.preventDefault();
 
@@ -143,13 +157,98 @@ export default function Admin({ session }) {
     }
   };
 
+  // --- GESTÃO DE USUÁRIOS (NOVO) ---
+
+  const handleDeleteUser = async (userId, userEmail) => {
+    const confirmation = window.prompt(`ATENÇÃO: Isso apagará PERMANENTEMENTE todos os dados de ${userEmail}.\n\nPara confirmar, digite "DELETAR" abaixo:`);
+    
+    if (confirmation === "DELETAR") {
+        try {
+            setLoading(true);
+            // 1. Apaga dependências manualmente para evitar erro de Foreign Key
+            await supabase.from('user_progress').delete().eq('user_id', userId);
+            await supabase.from('reflections').delete().eq('user_id', userId);
+            await supabase.from('friendships').delete().or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+            
+            // 2. Apaga o Perfil
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+            
+            if (error) throw error;
+            
+            alert("Usuário deletado do banco de dados com sucesso!");
+            fetchUsers();
+        } catch (error) {
+            alert("Erro ao deletar: " + error.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+  };
+
+  const handleResetUser = async (userId, userName) => {
+    if (window.confirm(`Tem certeza que deseja ZERAR o progresso de ${userName}? O nível voltará para 1.`)) {
+        try {
+            setLoading(true);
+            // 1. Limpa tabelas de progresso
+            await supabase.from('user_progress').delete().eq('user_id', userId);
+            await supabase.from('reflections').delete().eq('user_id', userId);
+
+            // 2. Reseta status do perfil
+            const { error } = await supabase.from('profiles').update({
+                xp: 0,
+                level: 1,
+                current_streak: 0,
+                longest_streak: 0
+            }).eq('id', userId);
+
+            if (error) throw error;
+
+            alert(`Progresso de ${userName} foi zerado.`);
+            fetchUsers();
+        } catch (error) {
+            alert("Erro ao resetar: " + error.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+  };
+
   return (
     <div className="container">
-      <header style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 30}}>
-        <button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%'}} onClick={() => view === 'detail' ? setView('list') : navigate('/app')}><ArrowLeft size={20}/></button>
-        <h2 style={{margin: 0, color: '#7C3AED'}}>{view === 'list' ? 'Gestão de Trilhas' : selectedTrail?.title}</h2>
+      <header style={{marginBottom: 30}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20}}>
+            <button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%'}} onClick={() => navigate('/app')}><ArrowLeft size={20}/></button>
+            <h2 style={{margin: 0, color: '#7C3AED'}}>Painel do Mestre</h2>
+        </div>
+
+        {/* Navegação Principal */}
+        <div style={{display: 'flex', gap: 10, background: 'white', padding: 5, borderRadius: 12, boxShadow: '0 2px 5px rgba(0,0,0,0.05)'}}>
+            <button 
+                onClick={() => { setView('list'); fetchTrails(); }} 
+                style={{
+                    flex: 1, 
+                    background: view !== 'users' ? '#7C3AED' : 'transparent', 
+                    color: view !== 'users' ? 'white' : '#64748B',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                }}
+            >
+                <LayoutList size={18} /> Gestão de Trilhas
+            </button>
+            <button 
+                onClick={() => { setView('users'); fetchUsers(); }} 
+                style={{
+                    flex: 1, 
+                    background: view === 'users' ? '#7C3AED' : 'transparent', 
+                    color: view === 'users' ? 'white' : '#64748B',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                }}
+            >
+                <Users size={18} /> Gestão de Usuários
+            </button>
+        </div>
       </header>
 
+      {/* --- VISÃO: LISTA DE TRILHAS --- */}
       {view === 'list' && (
         <>
           <div style={{display: 'flex', marginBottom: 20, borderBottom: '1px solid #e2e8f0'}}>
@@ -181,7 +280,6 @@ export default function Admin({ session }) {
                      <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
                         <strong>{trail.title}</strong>
                         {trail.is_paid && <span style={{fontSize: '0.6rem', background: '#FEF3C7', color: '#D97706', padding: '2px 6px', borderRadius: 4, fontWeight: 'bold'}}>PRO</span>}
-                        {/* Indicador visual se tem prompt customizado */}
                         {trail.ai_prompt && <BrainCircuit size={14} color="#7C3AED" />}
                      </div>
                      <p style={{margin: 0, fontSize: '0.85rem'}}>{trail.description}</p>
@@ -197,10 +295,14 @@ export default function Admin({ session }) {
         </>
       )}
 
+      {/* --- VISÃO: DETALHES DA TRILHA (MISSÕES) --- */}
       {view === 'detail' && (
         <>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
-            <h3>Missões ({missions.length})</h3>
+            <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                <button className="outline" style={{padding: 5, width: 'auto'}} onClick={() => setView('list')}><ArrowLeft size={16}/></button>
+                <h3>Missões de: {selectedTrail?.title}</h3>
+            </div>
             <button style={{width: 'auto', fontSize: '0.8rem', padding: '8px 12px'}} onClick={() => { setFormData({ day_number: missions.length + 1, title: '', description: '', action_text: '', attribute: '', badge_name: '' }); setEditingItem(null); setShowMissionModal(true); }}><Plus size={14} style={{marginRight: 5}}/> Adicionar</button>
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
@@ -221,7 +323,56 @@ export default function Admin({ session }) {
         </>
       )}
 
-      {/* --- MODAL DA TRILHA --- */}
+      {/* --- VISÃO: GESTÃO DE USUÁRIOS (NOVO) --- */}
+      {view === 'users' && (
+        <div style={{display: 'flex', flexDirection: 'column', gap: 15}}>
+            <div style={{background: '#EFF6FF', padding: 15, borderRadius: 8, fontSize: '0.9rem', color: '#1E40AF', border: '1px solid #DBEAFE'}}>
+                <strong>Nota do Sistema:</strong> Ao deletar um usuário aqui, apagamos todos os dados (Perfil, XP, Histórico). Para remover o login (E-mail/Senha), use o painel do Supabase.
+            </div>
+
+            {usersList.map(user => (
+                <div key={user.id} className="mission-card" style={{padding: 20, display: 'flex', flexDirection: 'column', gap: 15, alignItems: 'flex-start'}}>
+                    <div style={{width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <div style={{textAlign: 'left'}}>
+                            <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                                <strong style={{fontSize: '1.1rem'}}>{user.full_name || 'Sem nome'}</strong>
+                                <span style={{fontSize: '0.7rem', background: user.is_pro ? '#FEF3C7' : '#E2E8F0', color: user.is_pro ? '#D97706' : '#64748B', padding: '2px 8px', borderRadius: 10, fontWeight: 'bold'}}>
+                                    {user.is_pro ? 'PRO' : 'FREE'}
+                                </span>
+                            </div>
+                            <div style={{color: '#64748B', fontSize: '0.9rem', marginTop: 4}}>{user.email}</div>
+                            <div style={{marginTop: 8, fontSize: '0.85rem'}}>
+                                <strong>Nível {user.level || 1}</strong> • {user.xp || 0} XP • {user.current_streak || 0} dias de ofensiva
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{display: 'flex', gap: 10, width: '100%', borderTop: '1px solid #f1f5f9', paddingTop: 15}}>
+                        <button 
+                            className="outline" 
+                            style={{flex: 1, fontSize: '0.9rem', borderColor: '#CBD5E1', color: '#475569'}}
+                            onClick={() => handleResetUser(user.id, user.full_name || user.email)}
+                        >
+                            <RefreshCcw size={16} style={{marginRight: 6}} /> Zerar Progresso
+                        </button>
+                        
+                        <button 
+                            style={{flex: 1, fontSize: '0.9rem', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5'}}
+                            onClick={() => handleDeleteUser(user.id, user.email)}
+                        >
+                            <Trash2 size={16} style={{marginRight: 6}} /> Deletar Usuário
+                        </button>
+                    </div>
+                </div>
+            ))}
+
+            {usersList.length === 0 && !loading && (
+                <p style={{color: '#94a3b8'}}>Nenhum usuário encontrado.</p>
+            )}
+        </div>
+      )}
+
+      {/* --- MODAIS DE TRILHA E MISSÃO (Mantidos iguais) --- */}
       {showTrailModal && (
         <Modal title={editingItem ? "Editar Trilha" : "Nova Trilha"} onClose={() => setShowTrailModal(false)} onSave={handleSaveTrail}>
           <label style={{display:'block', textAlign:'left', marginBottom:5}}>Nome da Trilha</label>
