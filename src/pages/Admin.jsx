@@ -122,7 +122,7 @@ export default function Admin({ session }) {
     fetchTrails();
   };
 
-  // --- CRUD TRILHAS E MISSÕES (Mantido igual) ---
+  // --- CRUD TRILHAS E MISSÕES ---
   const handleSaveTrail = async () => {
     if (!formData.title) return alert("Título obrigatório");
     const isPaid = formData.is_paid === true; 
@@ -199,7 +199,7 @@ export default function Admin({ session }) {
 
     try {
         setLoading(true);
-        // Graças ao CASCADE no banco, apagar o profile apaga tudo.
+        // Graças ao CASCADE configurado no banco, apagar o profile apaga tudo.
         const { error } = await supabase.from('profiles').delete().eq('id', userToDelete.id);
         if (error) throw error;
         setShowDeleteModal(false);
@@ -211,42 +211,36 @@ export default function Admin({ session }) {
     }
   };
 
- const confirmResetUser = async () => {
+  // --- AQUI ESTÁ A CORREÇÃO PRINCIPAL (HARD RESET) ---
+  const confirmResetUser = async () => {
     if (!userToReset || resetConfirmationText.toUpperCase() !== "ZERAR") return;
     
     try {
         setLoading(true);
 
-        // 1. Apaga APENAS o histórico de textos/reflexões (O passado é apagado)
+        // 1. Apaga histórico de reflexões (O passado)
         await supabase.from('reflections').delete().eq('user_id', userToReset.id);
         
-        // 2. REINICIA o progresso para o Dia 1 (Mantém a trilha que ele escolheu, mas volta pro início)
-        // Se usar .delete() aqui, ele perde a escolha da trilha. O .update() é melhor.
-        const { error: progressError } = await supabase.from('user_progress').update({
-            current_day: 1,
-            status: 'new',       // Volta status para "novo"
-            last_completed_at: null
-        }).eq('user_id', userToReset.id);
+        // 2. O PULO DO GATO: Deleta a linha de progresso inteira.
+        // Isso remove a "fonte" do XP corrompido e força o sistema a criar um novo "Dia 1".
+        await supabase.from('user_progress').delete().eq('user_id', userToReset.id);
 
-        // Caso o usuário não tenha progresso ainda (edge case), tentamos deletar só pra garantir limpeza
-        if (progressError) {
-             console.log("Usuário sem progresso ativo ou erro, tentando limpeza total...");
-             await supabase.from('user_progress').delete().eq('user_id', userToReset.id);
-        }
-
-        // 3. Reseta os atributos do Perfil (XP, Nível, Ofensiva)
-        await supabase.from('profiles').update({ 
+        // 3. Força o Perfil a zerar (sem risco do gatilho sobrescrever)
+        const { error } = await supabase.from('profiles').update({ 
             xp: 0, 
             level: 1, 
             current_streak: 0,
-            longest_streak: 0 
+            longest_streak: 0
         }).eq('id', userToReset.id);
+
+        if (error) throw error;
 
         setShowResetModal(false);
         fetchUsers();
-        alert(`O usuário ${userToReset.email} foi reiniciado para o Dia 1.`);
+        alert(`Sucesso! O usuário ${userToReset.email} foi reiniciado para o Dia 1.`);
 
     } catch (error) {
+        console.error(error);
         alert("Erro ao resetar: " + error.message);
     } finally {
         setLoading(false);
