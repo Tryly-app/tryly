@@ -1,36 +1,63 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical, BrainCircuit, Users, RefreshCcw, LayoutList } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, GripVertical, BrainCircuit, Users, RefreshCcw, LayoutList, AlertTriangle } from 'lucide-react';
 
-const Modal = ({ title, onClose, onSave, children }) => (
+// --- COMPONENTE MODAL ATUALIZADO (Aceita cor e texto do botão) ---
+const Modal = ({ title, onClose, onSave, children, saveLabel = "Salvar", saveColor = "#7C3AED", disableSave = false }) => (
   <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-    <div className="mission-card" style={{width: '90%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', padding: 25}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 20}}>
-        <h3>{title}</h3>
-        <button className="outline" style={{width: 'auto', padding: 5, border: 'none'}} onClick={onClose}><X size={20}/></button>
+    <div className="mission-card" style={{width: '90%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', padding: 25, background: 'white', borderRadius: 16}}>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
+        <h3 style={{margin: 0, color: '#1E293B'}}>{title}</h3>
+        <button className="outline" style={{width: 'auto', padding: 5, border: 'none', color: '#64748B'}} onClick={onClose}><X size={24}/></button>
       </div>
+      
       {children}
-      <button onClick={onSave} style={{marginTop: 20}}>Salvar</button>
+
+      <div style={{display: 'flex', gap: 10, marginTop: 25}}>
+        <button className="outline" onClick={onClose} style={{flex: 1, borderColor: '#E2E8F0', color: '#64748B'}}>
+            Cancelar
+        </button>
+        <button 
+            onClick={onSave} 
+            disabled={disableSave}
+            style={{
+                flex: 1, 
+                background: disableSave ? '#E2E8F0' : saveColor, 
+                borderColor: disableSave ? '#E2E8F0' : saveColor,
+                color: disableSave ? '#94A3B8' : 'white',
+                cursor: disableSave ? 'not-allowed' : 'pointer'
+            }}
+        >
+            {saveLabel}
+        </button>
+      </div>
     </div>
   </div>
 );
 
 export default function Admin({ session }) {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [view, setView] = useState('list'); 
   
   // Trilhas
   const [trails, setTrails] = useState([]);
   const [selectedTrail, setSelectedTrail] = useState(null);
   const [missions, setMissions] = useState([]);
+  
+  // Modais e Edição
   const [showTrailModal, setShowTrailModal] = useState(false);
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [tab, setTab] = useState('free');
   const [draggedItem, setDraggedItem] = useState(null);
+
+  // --- NOVO: ESTADOS PARA O MODAL DE DELETAR ---
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
   // Usuários
   const [usersList, setUsersList] = useState([]);
@@ -66,15 +93,12 @@ export default function Admin({ session }) {
   const fetchUsers = async () => {
     setLoading(true);
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-    if (error) {
-        console.error("Erro ao buscar usuários:", error);
-    } else {
-        console.log("Usuários carregados:", data); // Olhe o Console (F12) para ver se o XP está vindo
-    }
+    if (error) console.error(error);
     setUsersList(data || []);
     setLoading(false);
   };
 
+  // --- LÓGICA DE ARRASTAR (Drag & Drop) ---
   const handleDragStart = (e, index) => setDraggedItem(index);
   const handleDragOver = (e) => e.preventDefault();
 
@@ -95,6 +119,7 @@ export default function Admin({ session }) {
     fetchTrails();
   };
 
+  // --- CRUD TRILHAS ---
   const handleSaveTrail = async () => {
     if (!formData.title) return alert("Título obrigatório");
     const isPaid = formData.is_paid === true; 
@@ -112,18 +137,18 @@ export default function Admin({ session }) {
         setShowTrailModal(false);
         fetchTrails();
     } catch (error) {
-        alert("Erro ao salvar: " + error.message);
+        alert("Erro: " + error.message);
     }
   };
 
   const handleDeleteTrail = async (id) => {
     if (confirm("Deletar trilha e suas missões?")) {
-      const { error } = await supabase.from('trails').delete().eq('id', id);
-      if (error) alert(error.message);
-      else fetchTrails();
+      await supabase.from('trails').delete().eq('id', id);
+      fetchTrails();
     }
   };
 
+  // --- CRUD MISSÕES ---
   const handleSaveMission = async () => {
     if (!formData.title || !formData.day_number) return alert("Dados incompletos");
     const payload = { ...formData, trail_id: selectedTrail.id };
@@ -140,73 +165,59 @@ export default function Admin({ session }) {
         setShowMissionModal(false);
         fetchMissions(selectedTrail.id);
     } catch (error) {
-        alert("Erro ao salvar missão: " + error.message);
+        alert("Erro: " + error.message);
     }
   };
 
   const handleDeleteMission = async (id) => {
     if (confirm("Apagar missão?")) {
-      const { error } = await supabase.from('missions').delete().eq('id', id);
-      if (error) alert(error.message);
-      else fetchMissions(selectedTrail.id);
+      await supabase.from('missions').delete().eq('id', id);
+      fetchMissions(selectedTrail.id);
     }
   };
 
-  // --- CORREÇÃO NA DELEÇÃO ---
-  const handleDeleteUser = async (userId, userEmail) => {
-    const confirmation = window.prompt(`ATENÇÃO: Isso apagará PERMANENTEMENTE todos os dados de ${userEmail}.\n\nPara confirmar, digite "DELETAR":`);
-    
-    // Verifica se digitou DELETAR (Maiúsculo ou Minúsculo)
-    if (confirmation && confirmation.toUpperCase() === "DELETAR") {
-        try {
-            setLoading(true);
-            // 1. Limpa tabelas relacionadas
-            await supabase.from('user_progress').delete().eq('user_id', userId);
-            await supabase.from('reflections').delete().eq('user_id', userId);
-            await supabase.from('friendships').delete().or(`user_id.eq.${userId},friend_id.eq.${userId}`);
-            
-            // 2. Apaga o Perfil
-            const { error } = await supabase.from('profiles').delete().eq('id', userId);
-            
-            if (error) {
-                // Se der erro de permissão (RLS), avisa o usuário
-                if (error.code === '42501') {
-                    throw new Error("Permissão negada. Você precisa configurar a política RLS no Supabase para permitir que Admins deletem usuários.");
-                }
-                throw error;
-            }
-            
-            alert("Usuário deletado do banco de dados!");
-            fetchUsers();
-        } catch (error) {
-            alert("ERRO: " + error.message);
-        } finally {
-            setLoading(false);
-        }
-    } else if (confirmation) {
-        alert("Texto de confirmação incorreto. A ação foi cancelada.");
+  // --- LÓGICA DE DELETAR USUÁRIO (NOVA) ---
+  
+  // 1. Abre o Modal
+  const openDeleteUserModal = (user) => {
+    setUserToDelete(user);
+    setDeleteConfirmationText('');
+    setShowDeleteModal(true);
+  };
+
+  // 2. Executa a Deletion
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    if (deleteConfirmationText.toUpperCase() !== "DELETAR") return;
+
+    try {
+        setLoading(true);
+        // Tenta apagar direto (agora que configuramos o CASCADE no banco)
+        const { error } = await supabase.from('profiles').delete().eq('id', userToDelete.id);
+        
+        if (error) throw error;
+
+        // Sucesso
+        setShowDeleteModal(false);
+        fetchUsers();
+    } catch (error) {
+        alert("Erro ao deletar: " + error.message);
+    } finally {
+        setLoading(false);
     }
   };
 
   const handleResetUser = async (userId, userName) => {
-    if (window.confirm(`Tem certeza que deseja ZERAR o progresso de ${userName}?`)) {
+    if (window.confirm(`Zerar o progresso de ${userName}?`)) {
         try {
             setLoading(true);
             await supabase.from('user_progress').delete().eq('user_id', userId);
             await supabase.from('reflections').delete().eq('user_id', userId);
-
-            const { error } = await supabase.from('profiles').update({
-                xp: 0,
-                level: 1,
-                current_streak: 0,
-                longest_streak: 0
-            }).eq('id', userId);
-
-            if (error) throw error;
-            alert(`Progresso zerado com sucesso.`);
+            await supabase.from('profiles').update({ xp: 0, level: 1, current_streak: 0 }).eq('id', userId);
+            alert(`Progresso zerado.`);
             fetchUsers();
         } catch (error) {
-            alert("Erro ao resetar: " + error.message);
+            alert("Erro: " + error.message);
         } finally {
             setLoading(false);
         }
@@ -222,31 +233,16 @@ export default function Admin({ session }) {
         </div>
 
         <div style={{display: 'flex', gap: 10, background: 'white', padding: 5, borderRadius: 12, boxShadow: '0 2px 5px rgba(0,0,0,0.05)'}}>
-            <button 
-                onClick={() => { setView('list'); fetchTrails(); }} 
-                style={{
-                    flex: 1, 
-                    background: view !== 'users' ? '#7C3AED' : 'transparent', 
-                    color: view !== 'users' ? 'white' : '#64748B',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-                }}
-            >
+            <button onClick={() => { setView('list'); fetchTrails(); }} style={{flex: 1, background: view !== 'users' ? '#7C3AED' : 'transparent', color: view !== 'users' ? 'white' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8}}>
                 <LayoutList size={18} /> Gestão de Trilhas
             </button>
-            <button 
-                onClick={() => { setView('users'); fetchUsers(); }} 
-                style={{
-                    flex: 1, 
-                    background: view === 'users' ? '#7C3AED' : 'transparent', 
-                    color: view === 'users' ? 'white' : '#64748B',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-                }}
-            >
+            <button onClick={() => { setView('users'); fetchUsers(); }} style={{flex: 1, background: view === 'users' ? '#7C3AED' : 'transparent', color: view === 'users' ? 'white' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8}}>
                 <Users size={18} /> Gestão de Usuários
             </button>
         </div>
       </header>
 
+      {/* --- VISÃO: LISTA DE TRILHAS --- */}
       {view === 'list' && (
         <>
           <div style={{display: 'flex', marginBottom: 20, borderBottom: '1px solid #e2e8f0'}}>
@@ -254,26 +250,14 @@ export default function Admin({ session }) {
              <button onClick={() => setTab('paid')} style={{flex: 1, borderRadius: 0, background: tab === 'paid' ? '#F3E8FF' : 'transparent', color: tab === 'paid' ? '#7C3AED' : '#64748B', border: 'none', borderBottom: tab === 'paid' ? '2px solid #7C3AED' : 'none', fontWeight: 'bold'}}>Trilhas PRO</button>
           </div>
 
-          <button style={{marginBottom: 20}} onClick={() => { 
-              setFormData({ title: '', description: '', is_paid: tab === 'paid', ai_prompt: '' }); 
-              setEditingItem(null); 
-              setShowTrailModal(true); 
-          }}>
+          <button style={{marginBottom: 20}} onClick={() => { setFormData({ title: '', description: '', is_paid: tab === 'paid', ai_prompt: '' }); setEditingItem(null); setShowTrailModal(true); }}>
             <Plus size={18} style={{marginRight: 8}}/> Nova Trilha
           </button>
 
           <div style={{display: 'flex', flexDirection: 'column', gap: 15}}>
             {trails.filter(t => (tab === 'paid' ? t.is_paid : !t.is_paid)).map((trail, index) => (
-               <div 
-                 key={trail.id} 
-                 draggable
-                 onDragStart={(e) => handleDragStart(e, index)}
-                 onDragOver={handleDragOver}
-                 onDrop={(e) => handleDrop(e, index)}
-                 className="mission-card" 
-                 style={{padding: 20, display: 'flex', alignItems: 'center', gap: 15, cursor: 'grab', background: draggedItem === index ? '#f8fafc' : '#fff', transition: 'all 0.2s'}}
-               >
-                  <div style={{color: '#cbd5e1', cursor: 'grab'}}><GripVertical size={20}/></div>
+               <div key={trail.id} draggable onDragStart={(e) => handleDragStart(e, index)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, index)} className="mission-card" style={{padding: 20, display: 'flex', alignItems: 'center', gap: 15, cursor: 'grab', background: draggedItem === index ? '#f8fafc' : '#fff'}}>
+                  <div style={{color: '#cbd5e1'}}><GripVertical size={20}/></div>
                   <div style={{flex: 1, textAlign: 'left', cursor: 'pointer'}} onClick={() => { setSelectedTrail(trail); fetchMissions(trail.id); setView('detail'); }}>
                      <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
                         <strong>{trail.title}</strong>
@@ -288,27 +272,26 @@ export default function Admin({ session }) {
                   </div>
                </div>
             ))}
-            {trails.filter(t => (tab === 'paid' ? t.is_paid : !t.is_paid)).length === 0 && <p style={{textAlign: 'center', color: '#94a3b8'}}>Nenhuma trilha nesta categoria.</p>}
           </div>
         </>
       )}
 
+      {/* --- VISÃO: DETALHES --- */}
       {view === 'detail' && (
         <>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
             <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
                 <button className="outline" style={{padding: 5, width: 'auto'}} onClick={() => setView('list')}><ArrowLeft size={16}/></button>
-                <h3>Missões de: {selectedTrail?.title}</h3>
+                <h3>{selectedTrail?.title}</h3>
             </div>
-            <button style={{width: 'auto', fontSize: '0.8rem', padding: '8px 12px'}} onClick={() => { setFormData({ day_number: missions.length + 1, title: '', description: '', action_text: '', attribute: '', badge_name: '' }); setEditingItem(null); setShowMissionModal(true); }}><Plus size={14} style={{marginRight: 5}}/> Adicionar</button>
+            <button style={{width: 'auto', fontSize: '0.8rem', padding: '8px 12px'}} onClick={() => { setFormData({ day_number: missions.length + 1 }); setEditingItem(null); setShowMissionModal(true); }}><Plus size={14} style={{marginRight: 5}}/> Adicionar</button>
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
             {missions.map(m => (
-              <div key={m.id} style={{background: 'white', padding: 15, borderRadius: 12, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', textAlign: 'left'}}>
-                <div>
+              <div key={m.id} style={{background: 'white', padding: 15, borderRadius: 12, border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between'}}>
+                <div style={{textAlign: 'left'}}>
                    <span className="status-badge" style={{padding: '2px 8px', fontSize: '0.65rem'}}>Dia {m.day_number}</span>
                    <strong style={{display: 'block', color: '#333'}}>{m.title}</strong>
-                   <span style={{fontSize: '0.8rem', color: '#64748B'}}>{m.attribute} XP {m.badge_name && `• ${m.badge_name}`}</span>
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column', gap: 5}}>
                    <button className="outline" style={{width: 'auto', padding: 5}} onClick={() => { setFormData(m); setEditingItem(m); setShowMissionModal(true); }}><Edit2 size={14}/></button>
@@ -320,42 +303,25 @@ export default function Admin({ session }) {
         </>
       )}
 
+      {/* --- VISÃO: GESTÃO DE USUÁRIOS --- */}
       {view === 'users' && (
         <div style={{display: 'flex', flexDirection: 'column', gap: 15}}>
-            <div style={{background: '#EFF6FF', padding: 15, borderRadius: 8, fontSize: '0.9rem', color: '#1E40AF', border: '1px solid #DBEAFE'}}>
-                <strong>Nota:</strong> Se o XP estiver zero, verifique se seu app está salvando o XP total na tabela 'profiles'.
-            </div>
-
             {usersList.map(user => (
-                <div key={user.id} className="mission-card" style={{padding: 20, display: 'flex', flexDirection: 'column', gap: 15, alignItems: 'flex-start'}}>
-                    <div style={{width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                        <div style={{textAlign: 'left'}}>
-                            <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
-                                <strong style={{fontSize: '1.1rem'}}>{user.full_name || 'Sem nome'}</strong>
-                                <span style={{fontSize: '0.7rem', background: user.is_pro ? '#FEF3C7' : '#E2E8F0', color: user.is_pro ? '#D97706' : '#64748B', padding: '2px 8px', borderRadius: 10, fontWeight: 'bold'}}>
-                                    {user.is_pro ? 'PRO' : 'FREE'}
-                                </span>
-                            </div>
-                            <div style={{color: '#64748B', fontSize: '0.9rem', marginTop: 4}}>{user.email}</div>
-                            <div style={{marginTop: 8, fontSize: '0.85rem'}}>
-                                <strong>Nível {user.level || 1}</strong> • {user.xp || 0} XP • {user.current_streak || 0} dias de ofensiva
-                            </div>
+                <div key={user.id} className="mission-card" style={{padding: 20, display: 'flex', flexDirection: 'column', gap: 15}}>
+                    <div style={{textAlign: 'left'}}>
+                        <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                            <strong style={{fontSize: '1.1rem'}}>{user.full_name || 'Sem nome'}</strong>
+                            <span style={{fontSize: '0.7rem', background: user.is_pro ? '#FEF3C7' : '#E2E8F0', color: user.is_pro ? '#D97706' : '#64748B', padding: '2px 8px', borderRadius: 10, fontWeight: 'bold'}}>{user.is_pro ? 'PRO' : 'FREE'}</span>
                         </div>
+                        <div style={{color: '#64748B', fontSize: '0.9rem', marginTop: 4}}>{user.email}</div>
+                        <div style={{marginTop: 8, fontSize: '0.85rem'}}><strong>Lvl {user.level || 1}</strong> • {user.xp || 0} XP</div>
                     </div>
-
                     <div style={{display: 'flex', gap: 10, width: '100%', borderTop: '1px solid #f1f5f9', paddingTop: 15}}>
-                        <button 
-                            className="outline" 
-                            style={{flex: 1, fontSize: '0.9rem', borderColor: '#CBD5E1', color: '#475569'}}
-                            onClick={() => handleResetUser(user.id, user.full_name || user.email)}
-                        >
-                            <RefreshCcw size={16} style={{marginRight: 6}} /> Zerar Progresso
+                        <button className="outline" style={{flex: 1, fontSize: '0.9rem'}} onClick={() => handleResetUser(user.id, user.full_name)}>
+                            <RefreshCcw size={16} style={{marginRight: 6}} /> Zerar
                         </button>
-                        
-                        <button 
-                            style={{flex: 1, fontSize: '0.9rem', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5'}}
-                            onClick={() => handleDeleteUser(user.id, user.email)}
-                        >
+                        {/* BOTÃO QUE ABRE O MODAL NOVO */}
+                        <button style={{flex: 1, fontSize: '0.9rem', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5'}} onClick={() => openDeleteUserModal(user)}>
                             <Trash2 size={16} style={{marginRight: 6}} /> Deletar
                         </button>
                     </div>
@@ -364,21 +330,13 @@ export default function Admin({ session }) {
         </div>
       )}
 
+      {/* --- MODAIS DE TRILHA E MISSÃO (Mantidos) --- */}
       {showTrailModal && (
         <Modal title={editingItem ? "Editar Trilha" : "Nova Trilha"} onClose={() => setShowTrailModal(false)} onSave={handleSaveTrail}>
-          <label style={{display:'block', textAlign:'left', marginBottom:5}}>Nome da Trilha</label>
-          <input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="Ex: Desbloqueio Social" />
-          <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:10}}>Descrição Curta</label>
-          <input value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Ex: Perca a timidez em 7 dias" />
-          <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:15, color: '#7C3AED', fontWeight: 'bold'}}>
-            <BrainCircuit size={14} style={{marginRight: 5, display: 'inline'}} />
-            Personalidade da IA
-          </label>
-          <textarea rows="4" value={formData.ai_prompt || ''} onChange={e => setFormData({...formData, ai_prompt: e.target.value})} placeholder="Ex: Seja agressivo e curto." style={{background: '#F3E8FF', borderColor: '#C084FC'}}/>
-          <div style={{display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, padding: 10, background: '#f8fafc', borderRadius: 8}}>
-             <input type="checkbox" id="is_paid_check" checked={formData.is_paid || false} onChange={e => setFormData({...formData, is_paid: e.target.checked})} style={{width: '20px', height: '20px'}} />
-             <label htmlFor="is_paid_check" style={{margin: 0, cursor: 'pointer', fontWeight: 'bold', color: '#334155'}}>Esta trilha é exclusiva PRO?</label>
-          </div>
+          <label>Nome</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
+          <label>Descrição</label><input value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
+          <label>Prompt IA</label><textarea rows="3" value={formData.ai_prompt || ''} onChange={e => setFormData({...formData, ai_prompt: e.target.value})} />
+          <div style={{display:'flex', gap:10, marginTop:10}}><input type="checkbox" checked={formData.is_paid || false} onChange={e => setFormData({...formData, is_paid: e.target.checked})}/><label>Trilha PRO?</label></div>
         </Modal>
       )}
 
@@ -388,10 +346,59 @@ export default function Admin({ session }) {
              <div style={{flex: 1}}><label>Dia</label><input type="number" value={formData.day_number || ''} onChange={e => setFormData({...formData, day_number: e.target.value})} /></div>
              <div style={{flex: 2}}><label>XP</label><input type="number" value={formData.attribute || ''} onChange={e => setFormData({...formData, attribute: e.target.value})} /></div>
           </div>
-          <label style={{marginTop: 10, display: 'block'}}>Nome do Selo</label><input value={formData.badge_name || ''} onChange={e => setFormData({...formData, badge_name: e.target.value})} />
+          <label>Selo</label><input value={formData.badge_name || ''} onChange={e => setFormData({...formData, badge_name: e.target.value})} />
           <label>Título</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
           <label>Descrição</label><textarea rows="3" value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
-          <label>Ação (Botão)</label><input value={formData.action_text || ''} onChange={e => setFormData({...formData, action_text: e.target.value})} />
+          <label>Botão</label><input value={formData.action_text || ''} onChange={e => setFormData({...formData, action_text: e.target.value})} />
+        </Modal>
+      )}
+
+      {/* --- NOVO MODAL DE DELETAR (ESTILIZADO) --- */}
+      {showDeleteModal && (
+        <Modal 
+            title="⚠️ Zona de Perigo" 
+            onClose={() => setShowDeleteModal(false)} 
+            onSave={confirmDeleteUser}
+            saveLabel="Confirmar Exclusão"
+            saveColor="#DC2626"
+            disableSave={deleteConfirmationText.toUpperCase() !== "DELETAR"}
+        >
+           <div style={{textAlign: 'center'}}>
+              <div style={{background: '#FEF2F2', padding: 20, borderRadius: 50, width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'}}>
+                <AlertTriangle size={40} color="#DC2626" />
+              </div>
+
+              <p style={{color: '#475569', marginBottom: 20, lineHeight: 1.5}}>
+                 Você está prestes a apagar <strong>PERMANENTEMENTE</strong> todos os dados de:<br/>
+                 <span style={{color: '#7C3AED', fontWeight: 'bold', fontSize: '1.1rem', display: 'block', marginTop: 5}}>{userToDelete?.email}</span>
+              </p>
+              
+              <div style={{background: '#FFF1F2', padding: 15, borderRadius: 8, border: '1px solid #FECDD3', marginBottom: 25}}>
+                 <p style={{margin: 0, color: '#BE123C', fontSize: '0.85rem', fontWeight: 'bold'}}>Isso apagará perfil, histórico de missões e XP. Essa ação não pode ser desfeita.</p>
+              </div>
+
+              <label style={{display: 'block', textAlign: 'left', marginBottom: 8, fontSize: '0.9rem', color: '#334155', fontWeight: 'bold'}}>
+                 Para confirmar, digite "DELETAR" abaixo:
+              </label>
+              <input 
+                 value={deleteConfirmationText} 
+                 onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                 placeholder="DELETAR"
+                 style={{
+                    width: '100%', 
+                    padding: 12, 
+                    border: deleteConfirmationText.toUpperCase() === 'DELETAR' ? '2px solid #22C55E' : '2px solid #E2E8F0', 
+                    borderRadius: 8,
+                    fontSize: '1rem',
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    letterSpacing: 1,
+                    outline: 'none',
+                    color: '#333'
+                 }}
+              />
+           </div>
         </Modal>
       )}
     </div>
