@@ -4,8 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MP_ACCESS_TOKEN')!
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')! // Necessário para atualizar o usuário
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,29 +19,34 @@ serve(async (req) => {
   try {
     const url = new URL(req.url)
     
-    // 1. ROTA DE CRIAÇÃO DO CHECKOUT (Chamada pelo seu Site)
+    // 1. CRIA O CHECKOUT (COM O NOVO PREÇO)
     if (req.method === 'POST' && !url.searchParams.get('topic')) {
       const { user_id, email } = await req.json()
 
-      // Dados do Produto PRO
       const preference = {
         items: [
           {
             title: 'Tryly PRO - Assinatura Mensal',
             quantity: 1,
             currency_id: 'BRL',
-            unit_price: 29.90, // Defina seu preço aqui
+            unit_price: 9.90, // <--- PREÇO ATUALIZADO AQUI
           },
         ],
         payer: { email: email },
-        external_reference: user_id, // IMPORTANTE: Aqui vai o ID do usuário para sabermos quem pagou
+        external_reference: user_id,
         back_urls: {
-          success: 'https://tryly.com.br/app', // Mude para seu site real
+          success: 'https://tryly.com.br/app',
           failure: 'https://tryly.com.br/app',
           pending: 'https://tryly.com.br/app',
         },
         auto_return: 'approved',
-        notification_url: `${url.origin}/functions/v1/mercadopago?topic=payment`, // Onde o MP vai avisar
+        notification_url: `${url.origin}/functions/v1/mercadopago?topic=payment`,
+        payment_methods: {
+            excluded_payment_types: [
+                { id: "ticket" } // Opcional: Remove boleto se quiser só Pix/Cartão (Boleto demora a compensar)
+            ],
+            installments: 1 // Opcional: Trava em 1x se não quiser parcelamento
+        }
       }
 
       const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
@@ -60,29 +64,24 @@ serve(async (req) => {
       })
     }
 
-    // 2. ROTA DE WEBHOOK (Chamada pelo Mercado Pago quando pagam)
+    // 2. WEBHOOK (CONFIRMA O PAGAMENTO)
     if (url.searchParams.get('topic') === 'payment' || req.json().type === 'payment') {
         const id = url.searchParams.get('id') || (await req.json()).data.id
 
-        // Pergunta ao MP: "Esse pagamento foi aprovado mesmo?"
         const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
             headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}` }
         })
         const paymentData = await paymentRes.json()
 
         if (paymentData.status === 'approved') {
-            const userId = paymentData.external_reference // Pegamos o ID do usuário de volta
+            const userId = paymentData.external_reference
             
-            // Conecta no Supabase com permissão de Admin (Service Role)
             const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
             
-            // ATIVAR O PRO DO USUÁRIO
             await supabaseAdmin
                 .from('profiles')
                 .update({ is_pro: true })
                 .eq('id', userId)
-            
-            console.log(`Usuário ${userId} virou PRO!`)
         }
 
         return new Response(JSON.stringify({ received: true }), { status: 200 })

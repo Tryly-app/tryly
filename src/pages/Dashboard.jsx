@@ -7,7 +7,7 @@ import { User, Flame, Clock, Settings, X, Bell, Download, Share, UserPlus, Searc
 export default function Dashboard({ session }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [paymentLoading, setPaymentLoading] = useState(false); // Estado para loading do pagamento
+  const [paymentLoading, setPaymentLoading] = useState(false);
   
   // Dados Principais
   const [progress, setProgress] = useState(null);
@@ -67,13 +67,11 @@ export default function Dashboard({ session }) {
 
         let { data: prog } = await supabase.from('user_progress').select('*').eq('user_id', session.user.id).maybeSingle();
         
-        // Busca todas as trilhas
         const { data: trailsData } = await supabase.from('trails').select('*').order('position', { ascending: true });
         setAllTrails(trailsData || []);
 
         let trailId = prog?.trail_id;
         
-        // Se não tiver trilha definida no progresso, pega a primeira disponível
         if (!trailId && trailsData?.length > 0) {
             trailId = trailsData[0].id;
         }
@@ -82,12 +80,10 @@ export default function Dashboard({ session }) {
             const { data: trail } = await supabase.from('trails').select('*').eq('id', trailId).single();
             setActiveTrail(trail);
 
-            // Cria progresso se não existir
             if (!prog) {
                  const { data: newProg } = await supabase.from('user_progress').insert({ user_id: session.user.id, current_day: 1, trail_id: trailId, status: 'new' }).select().single();
                  prog = newProg;
             } else if (!prog.trail_id) {
-                // Atualiza progresso existente sem trilha
                 await supabase.from('user_progress').update({ trail_id: trailId }).eq('user_id', session.user.id);
                 prog.trail_id = trailId;
             }
@@ -106,11 +102,9 @@ export default function Dashboard({ session }) {
     }
   };
 
-  // --- NOVA FUNÇÃO DE PAGAMENTO ---
   const handlePayment = async () => {
     setPaymentLoading(true);
     try {
-        // Chama a Edge Function 'mercadopago'
         const { data, error } = await supabase.functions.invoke('mercadopago', {
             body: { 
                 user_id: session.user.id,
@@ -120,7 +114,6 @@ export default function Dashboard({ session }) {
 
         if (error) throw error;
         
-        // Se o MP devolveu o link, redireciona
         if (data?.init_point) {
             window.location.href = data.init_point;
         } else {
@@ -134,7 +127,6 @@ export default function Dashboard({ session }) {
     }
   };
 
-  // Abre o modal de venda
   const openProModal = () => { setShowProPopup(true); };
 
   const advanceToNextTrail = async () => {
@@ -152,7 +144,6 @@ export default function Dashboard({ session }) {
       }
   };
 
-  // Ranking & Amigos
   const fetchFriendsData = async () => {
       setFriendMsg('');
       const { data: friendships } = await supabase.from('friendships').select('*').eq('status', 'accepted').or(`user_id.eq.${session.user.id},friend_id.eq.${session.user.id}`);
@@ -258,8 +249,6 @@ export default function Dashboard({ session }) {
   if (view === 'mission') return ( <div className="container"><div className="status-badge">Dia {currentMission?.day_number}</div><h1>{currentMission?.title}</h1><p style={{fontSize: '1.1rem', marginTop: 20}}>{currentMission?.description}</p><div className="mission-card"><h3 style={{color: '#7C3AED'}}>Sua Ação</h3><p style={{fontWeight: '600', fontSize: '1.2rem'}}>{currentMission?.action_text}</p></div><div style={{marginTop: 'auto'}}><button onClick={startMission}>Aceitar Desafio</button><button className="outline mt-4" onClick={() => setView('dashboard')}>Voltar</button></div></div> );
 
   const locked = isMissionLocked();
-  
-  // FIX: Cálculo seguro de porcentagem para evitar NaN%
   const percent = progress ? Math.min(100, Math.round(((progress.current_day - 1) / 14) * 100)) : 0;
 
   return (
@@ -363,7 +352,7 @@ export default function Dashboard({ session }) {
                     disabled={paymentLoading}
                     style={{width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10}}
                 >
-                    {paymentLoading ? 'Gerando Link...' : 'Assinar por R$ 29,90/mês'}
+                    {paymentLoading ? 'Gerando Link...' : 'Assinar por R$ 9,90/mês'}
                 </button>
                 <button className="outline" onClick={() => setShowProPopup(false)} style={{width: '100%', marginTop: 10, border: 'none', color: '#64748B'}}>
                     Talvez depois
