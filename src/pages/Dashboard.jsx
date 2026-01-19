@@ -263,8 +263,8 @@ export default function Dashboard({ session }) {
       </header>
 
       {/* BANNER PRO */}
-      {!isPro && activeTrail?.position >= 2 && (
-          <div onClick={openProModal} style={{
+{!isPro && activeTrail && (
+              <div onClick={openProModal} style={{
               background: 'linear-gradient(90deg, #7C3AED 0%, #C084FC 100%)', color: '#fff', 
               padding: '12px 20px', borderRadius: 12, marginBottom: 30, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)'
