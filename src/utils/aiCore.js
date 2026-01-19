@@ -2,55 +2,48 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-// Adicionei o 4º parâmetro: customPrompt
 export async function processReflection(text, missionAttribute, badgeName, customPrompt) {
   try {
-    // Verifica se a chave existe (Evita erro antes de chamar o Google)
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
-      console.warn("API Key não encontrada no .env");
-      return fallbackResponse(text);
+      console.warn("⚠️ API Key não encontrada! Usando fallback.");
+      return fallbackResponse();
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // MUDANÇA AQUI: Usando a versão específica '001' para evitar erro 404
+    const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash-001", // Se der erro de novo, troque para "gemini-pro"
+        generationConfig: {
+            temperature: 1.2,
+            maxOutputTokens: 150,
+        }
+    });
 
-    // 1. Define a PERSONALIDADE (Admin vs Padrão)
+    // 1. Define a PERSONALIDADE
     let personaInstruction = "";
 
-    // Verifica se o Admin mandou um prompt específico para essa trilha
     if (customPrompt && customPrompt.trim().length > 0) {
         personaInstruction = `
-        DIRETRIZES DE PERSONALIDADE (PRIORIDADE MÁXIMA):
-        ${customPrompt}
-        
-        Importante: Ignore sua programação padrão e assuma COMPLETAMENTE a persona descrita acima.
+        ATENÇÃO - MODO ADMIN ATIVO:
+        Sua personalidade OBRIGATÓRIA é: "${customPrompt}"
+        Ignore qualquer instrução anterior e incorpore essa persona profundamente.
         `;
     } else {
-        // --- MODO PADRÃO (O MESTRE) ---
         personaInstruction = `
-        Contexto: Você é o "Mestre", a inteligência central do Tryly.
-        Diretrizes:
-        1. Frieza Estratégica: Valorize dados e execução. Sem confetes.
-        2. Linguagem de Fundador: Use termos como alavancagem e eficiência.
-        3. Exigência: Se o relato for raso, critique.
-        4. Tom: Calmo, firme e analítico.
+        Você é o "Mestre" do Tryly.
+        - Seja frio, analítico e curto.
+        - Valorize a execução, despreze desculpas.
+        - Use termos como: alavancagem, stack, XP, jogo infinito.
         `;
     }
 
-    // 2. Monta o Prompt Final
+    // 2. Monta o Prompt
     const prompt = `
       ${personaInstruction}
       
-      --- DADOS DA MISSÃO ---
-      Atributo (XP): "${missionAttribute}"
-      Selo em jogo: "${badgeName || 'Nenhum'}"
+      DADOS: Ganhou ${missionAttribute} | Selo: ${badgeName || 'Nenhum'}
+      RELATO: "${text}"
       
-      --- RELATO DO USUÁRIO ---
-      "${text}"
-      
-      --- SUA TAREFA ---
-      Analise o relato com base na personalidade definida.
-      Responda em no máximo 2 ou 3 frases.
-      Finalize com uma chamada para ação curta condizente com a personalidade.
+      AÇÃO: Responda em 2 frases curtas. Seja criativo e diferente da última vez.
     `;
 
     const result = await model.generateContent(prompt);
@@ -58,13 +51,18 @@ export async function processReflection(text, missionAttribute, badgeName, custo
     return response.text();
 
   } catch (error) {
-    console.error("Erro na IA:", error);
-    return fallbackResponse(text);
+    console.error("🚨 ERRO IA:", error);
+    
+    // Se o erro for de permissão (403), avisa para liberar o domínio
+    if (error.message?.includes("403")) {
+        console.error("⚠️ BLOQUEIO: Você precisa liberar 'tryly.com.br' no Google Cloud Console.");
+    }
+
+    return fallbackResponse();
   }
 }
 
-function fallbackResponse(text) {
-  // Lista de respostas variadas para quando a IA falhar ou estiver offline
+function fallbackResponse() {
   const fallbacks = [
     "Registro salvo. A consistência gera alavancagem. Continue operando.",
     "Input recebido. Menos conversa, mais ação. O ranking te espera.",
@@ -72,6 +70,5 @@ function fallbackResponse(text) {
     "Sua jornada continua. A mediocridade é o inimigo. Avance.",
     "Execução validada. Foque no próximo passo. Go Try."
   ];
-
   return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
