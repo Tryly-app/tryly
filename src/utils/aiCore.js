@@ -9,9 +9,9 @@ export async function processReflection(text, missionAttribute, badgeName, custo
       return fallbackResponse();
     }
 
-    // MUDANÇA AQUI: Usando a versão específica '001' para evitar erro 404
+    // --- CORREÇÃO AQUI: Voltamos para o nome padrão que funciona ---
     const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash-001", // Se der erro de novo, troque para "gemini-pro"
+        model: "gemini-1.5-flash", 
         generationConfig: {
             temperature: 1.2,
             maxOutputTokens: 150,
@@ -52,12 +52,6 @@ export async function processReflection(text, missionAttribute, badgeName, custo
 
   } catch (error) {
     console.error("🚨 ERRO IA:", error);
-    
-    // Se o erro for de permissão (403), avisa para liberar o domínio
-    if (error.message?.includes("403")) {
-        console.error("⚠️ BLOQUEIO: Você precisa liberar 'tryly.com.br' no Google Cloud Console.");
-    }
-
     return fallbackResponse();
   }
 }
