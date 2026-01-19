@@ -194,18 +194,27 @@ export default function Admin({ session }) {
   };
 
   // 2. EXECUTAR AÇÕES
-  const confirmDeleteUser = async () => {
+const confirmDeleteUser = async () => {
     if (!userToDelete || deleteConfirmationText.toUpperCase() !== "DELETAR") return;
 
     try {
         setLoading(true);
-        // Graças ao CASCADE configurado no banco, apagar o profile apaga tudo.
-        const { error } = await supabase.from('profiles').delete().eq('id', userToDelete.id);
+        
+        // CHAMA A EDGE FUNCTION PODEROSA
+        const { data, error } = await supabase.functions.invoke('delete-user', {
+            body: { user_id: userToDelete.id }
+        });
+
         if (error) throw error;
+
+        // Se a função não retornou erro, é porque deu certo
         setShowDeleteModal(false);
-        fetchUsers();
+        fetchUsers(); // Atualiza a lista
+        alert(`Conta de ${userToDelete.email} foi exterminada com sucesso.`);
+
     } catch (error) {
-        alert("Erro ao deletar: " + error.message);
+        console.error("Erro ao deletar:", error);
+        alert("Erro ao deletar usuário: " + (error.message || "Erro desconhecido"));
     } finally {
         setLoading(false);
     }
