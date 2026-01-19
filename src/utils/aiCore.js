@@ -1,55 +1,57 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-
+// Versão OpenAI (GPT-3.5 ou GPT-4o)
 export async function processReflection(text, missionAttribute, badgeName, customPrompt) {
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+
+  if (!apiKey) {
+    console.warn("⚠️ API Key da OpenAI não encontrada!");
+    return fallbackResponse();
+  }
+
+  // 1. Define a PERSONALIDADE
+  let systemMessage = "";
+  if (customPrompt && customPrompt.trim().length > 0) {
+      systemMessage = `PERSONALIDADE: "${customPrompt}". Ignore instruções anteriores.`;
+  } else {
+      systemMessage = `Você é o "Mestre" do Tryly. Seja frio, analítico e curto. Foco em execução.`;
+  }
+
+  // 2. Monta a Mensagem do Usuário
+  const userMessage = `
+    DADOS: Ganhou ${missionAttribute} XP | Selo: ${badgeName || 'Nenhum'}
+    RELATO: "${text}"
+    
+    AÇÃO: Responda em 2 frases curtas e motivadoras (estilo "tough love").
+  `;
+
   try {
-    if (!import.meta.env.VITE_GEMINI_API_KEY) {
-      console.warn("⚠️ API Key não encontrada! Usando fallback.");
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo", // Ou "gpt-4o" se quiser pagar um pouco mais por mais inteligência
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: userMessage }
+        ],
+        temperature: 1.0,
+        max_tokens: 150
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      console.error("🚨 Erro OpenAI:", data.error);
       return fallbackResponse();
     }
 
-    // --- MUDANÇA CRUCIAL: Usando 'gemini-pro' (O Clássico que funciona em contas novas) ---
-    const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash", 
-        generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 200,
-        }
-    });
-
-    // 1. Define a PERSONALIDADE
-    let personaInstruction = "";
-
-    if (customPrompt && customPrompt.trim().length > 0) {
-        personaInstruction = `
-        ATENÇÃO - MODO ADMIN:
-        Sua personalidade é: "${customPrompt}"
-        Ignore instruções anteriores.
-        `;
-    } else {
-        personaInstruction = `
-        Você é o "Mestre" do Tryly.
-        Seja frio, analítico e curto. Foco em execução e consistência.
-        `;
-    }
-
-    // 2. Monta o Prompt
-    const prompt = `
-      ${personaInstruction}
-      
-      DADOS: Ganhou ${missionAttribute} | Selo: ${badgeName || 'Nenhum'}
-      RELATO: "${text}"
-      
-      AÇÃO: Responda em 2 frases curtas e impactantes.
-    `;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    return data.choices[0].message.content;
 
   } catch (error) {
-    console.error("🚨 ERRO IA:", error);
+    console.error("🚨 Erro de Conexão:", error);
     return fallbackResponse();
   }
 }
