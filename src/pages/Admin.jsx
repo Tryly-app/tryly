@@ -197,24 +197,23 @@ export default function Admin({ session }) {
 const confirmDeleteUser = async () => {
     if (!userToDelete || deleteConfirmationText.toUpperCase() !== "DELETAR") return;
 
+    setLoading(true);
     try {
-        setLoading(true);
-        
-        // CHAMA A EDGE FUNCTION PODEROSA
-        const { data, error } = await supabase.functions.invoke('delete-user', {
+        // Tenta deletar usando a FORÇA BRUTA (Edge Function)
+        // Isso apaga o Login (Auth) e o Perfil (Banco) de uma vez
+        const { error } = await supabase.functions.invoke('delete-user', {
             body: { user_id: userToDelete.id }
         });
 
         if (error) throw error;
 
-        // Se a função não retornou erro, é porque deu certo
+        alert(`Usuário ${userToDelete.email} foi deletado permanentemente.`);
         setShowDeleteModal(false);
-        fetchUsers(); // Atualiza a lista
-        alert(`Conta de ${userToDelete.email} foi exterminada com sucesso.`);
+        fetchUsers(); // Atualiza a lista na hora
 
     } catch (error) {
         console.error("Erro ao deletar:", error);
-        alert("Erro ao deletar usuário: " + (error.message || "Erro desconhecido"));
+        alert("Erro ao tentar deletar: " + error.message);
     } finally {
         setLoading(false);
     }
