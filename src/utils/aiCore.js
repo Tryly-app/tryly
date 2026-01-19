@@ -9,11 +9,11 @@ export async function processReflection(text, missionAttribute, badgeName, custo
       return fallbackResponse();
     }
 
-    // --- CORREÇÃO AQUI: Voltamos para o nome padrão que funciona ---
+    // --- CORREÇÃO FINAL: Usando o modelo 'gemini-pro' que é o mais estável ---
     const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash", 
+        model: "gemini-pro", 
         generationConfig: {
-            temperature: 1.2,
+            temperature: 1.0, // Levemente ajustado para o Pro
             maxOutputTokens: 150,
         }
     });
