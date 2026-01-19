@@ -4,17 +4,18 @@ const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 export async function processReflection(text, missionAttribute, badgeName, customPrompt) {
   try {
+    // Verifica se a chave existe
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
       console.warn("⚠️ API Key não encontrada! Usando fallback.");
       return fallbackResponse();
     }
 
-    // --- CORREÇÃO FINAL: Usando o modelo 'gemini-pro' que é o mais estável ---
+    // --- CORREÇÃO: Usando o modelo FLASH (Mais rápido e compatível com sua chave) ---
     const model = genAI.getGenerativeModel({ 
-        model: "gemini-pro", 
+        model: "gemini-1.5-flash", 
         generationConfig: {
-            temperature: 1.0, // Levemente ajustado para o Pro
-            maxOutputTokens: 150,
+            temperature: 1.2,
+            maxOutputTokens: 200,
         }
     });
 
@@ -51,7 +52,7 @@ export async function processReflection(text, missionAttribute, badgeName, custo
     return response.text();
 
   } catch (error) {
-    console.error("🚨 ERRO IA:", error);
+    console.error("🚨 ERRO IA DETALHADO:", error);
     return fallbackResponse();
   }
 }
