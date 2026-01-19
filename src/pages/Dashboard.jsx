@@ -7,6 +7,7 @@ import { User, Flame, Clock, Settings, X, Bell, Download, Share, UserPlus, Searc
 export default function Dashboard({ session }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [paymentLoading, setPaymentLoading] = useState(false); // Estado para loading do pagamento
   
   // Dados Principais
   const [progress, setProgress] = useState(null);
@@ -56,47 +57,85 @@ export default function Dashboard({ session }) {
 
   const fetchData = async () => {
     setLoading(true);
-    let { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-    if (profile) {
-        setAvatarUrl(profile.avatar_url);
-        setIsAdmin(profile.role === 'admin');
-        setIsPro(profile.is_pro || false);
-    }
-
-    let { data: prog } = await supabase.from('user_progress').select('*').eq('user_id', session.user.id).single();
-    
-    // Busca todas as trilhas e inclui a coluna ai_prompt
-    const { data: trailsData } = await supabase.from('trails').select('*').order('position', { ascending: true });
-    setAllTrails(trailsData || []);
-
-    let trailId = prog?.trail_id;
-    if (!trailId && trailsData?.length > 0) {
-        trailId = trailsData[0].id;
-    }
-
-    if (trailId) {
-        const { data: trail } = await supabase.from('trails').select('*').eq('id', trailId).single();
-        setActiveTrail(trail);
-
-        if (!prog) {
-             const { data: newProg } = await supabase.from('user_progress').insert({ user_id: session.user.id, current_day: 1, trail_id: trailId, status: 'new' }).select().single();
-             prog = newProg;
-        } else if (!prog.trail_id) {
-            await supabase.from('user_progress').update({ trail_id: trailId }).eq('user_id', session.user.id);
-            prog.trail_id = trailId;
+    try {
+        let { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        if (profile) {
+            setAvatarUrl(profile.avatar_url);
+            setIsAdmin(profile.role === 'admin');
+            setIsPro(profile.is_pro || false);
         }
-    }
 
-    if (prog && trailId) {
-      let { data: mission } = await supabase.from('missions').select('*').eq('trail_id', trailId).eq('day_number', prog.current_day).maybeSingle(); 
-      setProgress(prog);
-      setCurrentMission(mission);
-      checkReminder(prog);
+        let { data: prog } = await supabase.from('user_progress').select('*').eq('user_id', session.user.id).maybeSingle();
+        
+        // Busca todas as trilhas
+        const { data: trailsData } = await supabase.from('trails').select('*').order('position', { ascending: true });
+        setAllTrails(trailsData || []);
+
+        let trailId = prog?.trail_id;
+        
+        // Se não tiver trilha definida no progresso, pega a primeira disponível
+        if (!trailId && trailsData?.length > 0) {
+            trailId = trailsData[0].id;
+        }
+
+        if (trailId) {
+            const { data: trail } = await supabase.from('trails').select('*').eq('id', trailId).single();
+            setActiveTrail(trail);
+
+            // Cria progresso se não existir
+            if (!prog) {
+                 const { data: newProg } = await supabase.from('user_progress').insert({ user_id: session.user.id, current_day: 1, trail_id: trailId, status: 'new' }).select().single();
+                 prog = newProg;
+            } else if (!prog.trail_id) {
+                // Atualiza progresso existente sem trilha
+                await supabase.from('user_progress').update({ trail_id: trailId }).eq('user_id', session.user.id);
+                prog.trail_id = trailId;
+            }
+        }
+
+        if (prog && trailId) {
+          let { data: mission } = await supabase.from('missions').select('*').eq('trail_id', trailId).eq('day_number', prog.current_day).maybeSingle(); 
+          setProgress(prog);
+          setCurrentMission(mission);
+          checkReminder(prog);
+        }
+    } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleBuyPro = () => { setShowProPopup(true); };
+  // --- NOVA FUNÇÃO DE PAGAMENTO ---
+  const handlePayment = async () => {
+    setPaymentLoading(true);
+    try {
+        // Chama a Edge Function 'mercadopago'
+        const { data, error } = await supabase.functions.invoke('mercadopago', {
+            body: { 
+                user_id: session.user.id,
+                email: session.user.email 
+            }
+        });
+
+        if (error) throw error;
+        
+        // Se o MP devolveu o link, redireciona
+        if (data?.init_point) {
+            window.location.href = data.init_point;
+        } else {
+            alert("Erro ao gerar link de pagamento. Tente novamente.");
+        }
+    } catch (error) {
+        console.error("Erro Pagamento:", error);
+        alert("Erro ao conectar com o sistema de pagamento.");
+    } finally {
+        setPaymentLoading(false);
+    }
+  };
+
+  // Abre o modal de venda
+  const openProModal = () => { setShowProPopup(true); };
 
   const advanceToNextTrail = async () => {
       const { data: trails } = await supabase.from('trails').select('*').order('position', { ascending: true });
@@ -113,7 +152,7 @@ export default function Dashboard({ session }) {
       }
   };
 
-  // Ranking
+  // Ranking & Amigos
   const fetchFriendsData = async () => {
       setFriendMsg('');
       const { data: friendships } = await supabase.from('friendships').select('*').eq('status', 'accepted').or(`user_id.eq.${session.user.id},friend_id.eq.${session.user.id}`);
@@ -219,7 +258,9 @@ export default function Dashboard({ session }) {
   if (view === 'mission') return ( <div className="container"><div className="status-badge">Dia {currentMission?.day_number}</div><h1>{currentMission?.title}</h1><p style={{fontSize: '1.1rem', marginTop: 20}}>{currentMission?.description}</p><div className="mission-card"><h3 style={{color: '#7C3AED'}}>Sua Ação</h3><p style={{fontWeight: '600', fontSize: '1.2rem'}}>{currentMission?.action_text}</p></div><div style={{marginTop: 'auto'}}><button onClick={startMission}>Aceitar Desafio</button><button className="outline mt-4" onClick={() => setView('dashboard')}>Voltar</button></div></div> );
 
   const locked = isMissionLocked();
-  const percent = Math.min(100, Math.round(((progress?.current_day - 1) / 14) * 100));
+  
+  // FIX: Cálculo seguro de porcentagem para evitar NaN%
+  const percent = progress ? Math.min(100, Math.round(((progress.current_day - 1) / 14) * 100)) : 0;
 
   return (
     <div className="container" style={{position: 'relative'}}>
@@ -232,8 +273,9 @@ export default function Dashboard({ session }) {
         </div>
       </header>
 
+      {/* BANNER PRO */}
       {!isPro && activeTrail?.position >= 2 && (
-          <div onClick={handleBuyPro} style={{
+          <div onClick={openProModal} style={{
               background: 'linear-gradient(90deg, #7C3AED 0%, #C084FC 100%)', color: '#fff', 
               padding: '12px 20px', borderRadius: 12, marginBottom: 30, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)'
@@ -305,21 +347,32 @@ export default function Dashboard({ session }) {
           </div>
       </div>
 
+      {/* MODAL PRO / PAGAMENTO */}
       {showProPopup && (
         <div className="popup-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 300, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
             <div className="mission-card" style={{width: '90%', maxWidth: '350px', textAlign: 'center', padding: '30px 20px'}}>
                 <div style={{background: '#F3E8FF', width: 60, height: 60, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'}}>
                     <Rocket size={32} color="#7C3AED" />
                 </div>
-                <h3 style={{marginBottom: 10, color: '#1e293b'}}>Em Construção!</h3>
+                <h3 style={{marginBottom: 10, color: '#1e293b'}}>Desbloqueie o Potencial</h3>
                 <p style={{color: '#64748B', marginBottom: 25, lineHeight: '1.5'}}>
-                    Estamos finalizando o <strong>Modo PRO</strong> com conteúdos exclusivos. Aguarde novidades em breve!
+                    Tenha acesso ilimitado a todas as trilhas, mentoria avançada da IA e suporte prioritário.
                 </p>
-                <button onClick={() => setShowProPopup(false)} style={{width: '100%'}}>Entendi, vou aguardar</button>
+                <button 
+                    onClick={handlePayment} 
+                    disabled={paymentLoading}
+                    style={{width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10}}
+                >
+                    {paymentLoading ? 'Gerando Link...' : 'Assinar por R$ 29,90/mês'}
+                </button>
+                <button className="outline" onClick={() => setShowProPopup(false)} style={{width: '100%', marginTop: 10, border: 'none', color: '#64748B'}}>
+                    Talvez depois
+                </button>
             </div>
         </div>
       )}
 
+      {/* MODAL DE AMIGOS */}
       {showFriendsModal && (
           <div className="popup-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 300, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
               <div className="mission-card" style={{width: '90%', maxWidth: '400px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', margin: 0, padding: 0, overflow: 'hidden'}}>
