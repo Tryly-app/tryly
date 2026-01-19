@@ -19,11 +19,9 @@ const Modal = ({ title, onClose, onSave, children }) => (
 export default function Admin({ session }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  
-  // Views: 'list' (trilhas), 'detail' (missões), 'users' (gestão de usuários)
   const [view, setView] = useState('list'); 
   
-  // Dados Trilhas
+  // Trilhas
   const [trails, setTrails] = useState([]);
   const [selectedTrail, setSelectedTrail] = useState(null);
   const [missions, setMissions] = useState([]);
@@ -31,10 +29,10 @@ export default function Admin({ session }) {
   const [showMissionModal, setShowMissionModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
-  const [tab, setTab] = useState('free'); // free | paid
+  const [tab, setTab] = useState('free');
   const [draggedItem, setDraggedItem] = useState(null);
 
-  // Dados Usuários
+  // Usuários
   const [usersList, setUsersList] = useState([]);
 
   useEffect(() => {
@@ -67,13 +65,16 @@ export default function Admin({ session }) {
 
   const fetchUsers = async () => {
     setLoading(true);
-    // Busca perfis ordenados por criação (mais recentes primeiro)
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (error) {
+        console.error("Erro ao buscar usuários:", error);
+    } else {
+        console.log("Usuários carregados:", data); // Olhe o Console (F12) para ver se o XP está vindo
+    }
     setUsersList(data || []);
     setLoading(false);
   };
 
-  // --- ARRASTAR E SOLTAR TRILHAS ---
   const handleDragStart = (e, index) => setDraggedItem(index);
   const handleDragOver = (e) => e.preventDefault();
 
@@ -94,11 +95,9 @@ export default function Admin({ session }) {
     fetchTrails();
   };
 
-  // --- CRUD TRILHAS ---
   const handleSaveTrail = async () => {
     if (!formData.title) return alert("Título obrigatório");
     const isPaid = formData.is_paid === true; 
-    
     try {
         let error;
         if (editingItem) {
@@ -109,7 +108,6 @@ export default function Admin({ session }) {
           const res = await supabase.from('trails').insert({ ...formData, is_paid: isPaid, position: maxPos + 1 });
           error = res.error;
         }
-
         if (error) throw error;
         setShowTrailModal(false);
         fetchTrails();
@@ -126,11 +124,9 @@ export default function Admin({ session }) {
     }
   };
 
-  // --- CRUD MISSÕES ---
   const handleSaveMission = async () => {
     if (!formData.title || !formData.day_number) return alert("Dados incompletos");
     const payload = { ...formData, trail_id: selectedTrail.id };
-    
     try {
         let error;
         if (editingItem) {
@@ -140,7 +136,6 @@ export default function Admin({ session }) {
           const res = await supabase.from('missions').insert(payload);
           error = res.error;
         }
-
         if (error) throw error;
         setShowMissionModal(false);
         fetchMissions(selectedTrail.id);
@@ -157,15 +152,15 @@ export default function Admin({ session }) {
     }
   };
 
-  // --- GESTÃO DE USUÁRIOS (NOVO) ---
-
+  // --- CORREÇÃO NA DELEÇÃO ---
   const handleDeleteUser = async (userId, userEmail) => {
-    const confirmation = window.prompt(`ATENÇÃO: Isso apagará PERMANENTEMENTE todos os dados de ${userEmail}.\n\nPara confirmar, digite "DELETAR" abaixo:`);
+    const confirmation = window.prompt(`ATENÇÃO: Isso apagará PERMANENTEMENTE todos os dados de ${userEmail}.\n\nPara confirmar, digite "DELETAR":`);
     
-    if (confirmation === "DELETAR") {
+    // Verifica se digitou DELETAR (Maiúsculo ou Minúsculo)
+    if (confirmation && confirmation.toUpperCase() === "DELETAR") {
         try {
             setLoading(true);
-            // 1. Apaga dependências manualmente para evitar erro de Foreign Key
+            // 1. Limpa tabelas relacionadas
             await supabase.from('user_progress').delete().eq('user_id', userId);
             await supabase.from('reflections').delete().eq('user_id', userId);
             await supabase.from('friendships').delete().or(`user_id.eq.${userId},friend_id.eq.${userId}`);
@@ -173,27 +168,33 @@ export default function Admin({ session }) {
             // 2. Apaga o Perfil
             const { error } = await supabase.from('profiles').delete().eq('id', userId);
             
-            if (error) throw error;
+            if (error) {
+                // Se der erro de permissão (RLS), avisa o usuário
+                if (error.code === '42501') {
+                    throw new Error("Permissão negada. Você precisa configurar a política RLS no Supabase para permitir que Admins deletem usuários.");
+                }
+                throw error;
+            }
             
-            alert("Usuário deletado do banco de dados com sucesso!");
+            alert("Usuário deletado do banco de dados!");
             fetchUsers();
         } catch (error) {
-            alert("Erro ao deletar: " + error.message);
+            alert("ERRO: " + error.message);
         } finally {
             setLoading(false);
         }
+    } else if (confirmation) {
+        alert("Texto de confirmação incorreto. A ação foi cancelada.");
     }
   };
 
   const handleResetUser = async (userId, userName) => {
-    if (window.confirm(`Tem certeza que deseja ZERAR o progresso de ${userName}? O nível voltará para 1.`)) {
+    if (window.confirm(`Tem certeza que deseja ZERAR o progresso de ${userName}?`)) {
         try {
             setLoading(true);
-            // 1. Limpa tabelas de progresso
             await supabase.from('user_progress').delete().eq('user_id', userId);
             await supabase.from('reflections').delete().eq('user_id', userId);
 
-            // 2. Reseta status do perfil
             const { error } = await supabase.from('profiles').update({
                 xp: 0,
                 level: 1,
@@ -202,8 +203,7 @@ export default function Admin({ session }) {
             }).eq('id', userId);
 
             if (error) throw error;
-
-            alert(`Progresso de ${userName} foi zerado.`);
+            alert(`Progresso zerado com sucesso.`);
             fetchUsers();
         } catch (error) {
             alert("Erro ao resetar: " + error.message);
@@ -221,7 +221,6 @@ export default function Admin({ session }) {
             <h2 style={{margin: 0, color: '#7C3AED'}}>Painel do Mestre</h2>
         </div>
 
-        {/* Navegação Principal */}
         <div style={{display: 'flex', gap: 10, background: 'white', padding: 5, borderRadius: 12, boxShadow: '0 2px 5px rgba(0,0,0,0.05)'}}>
             <button 
                 onClick={() => { setView('list'); fetchTrails(); }} 
@@ -248,7 +247,6 @@ export default function Admin({ session }) {
         </div>
       </header>
 
-      {/* --- VISÃO: LISTA DE TRILHAS --- */}
       {view === 'list' && (
         <>
           <div style={{display: 'flex', marginBottom: 20, borderBottom: '1px solid #e2e8f0'}}>
@@ -295,7 +293,6 @@ export default function Admin({ session }) {
         </>
       )}
 
-      {/* --- VISÃO: DETALHES DA TRILHA (MISSÕES) --- */}
       {view === 'detail' && (
         <>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
@@ -323,11 +320,10 @@ export default function Admin({ session }) {
         </>
       )}
 
-      {/* --- VISÃO: GESTÃO DE USUÁRIOS (NOVO) --- */}
       {view === 'users' && (
         <div style={{display: 'flex', flexDirection: 'column', gap: 15}}>
             <div style={{background: '#EFF6FF', padding: 15, borderRadius: 8, fontSize: '0.9rem', color: '#1E40AF', border: '1px solid #DBEAFE'}}>
-                <strong>Nota do Sistema:</strong> Ao deletar um usuário aqui, apagamos todos os dados (Perfil, XP, Histórico). Para remover o login (E-mail/Senha), use o painel do Supabase.
+                <strong>Nota:</strong> Se o XP estiver zero, verifique se seu app está salvando o XP total na tabela 'profiles'.
             </div>
 
             {usersList.map(user => (
@@ -360,41 +356,25 @@ export default function Admin({ session }) {
                             style={{flex: 1, fontSize: '0.9rem', background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5'}}
                             onClick={() => handleDeleteUser(user.id, user.email)}
                         >
-                            <Trash2 size={16} style={{marginRight: 6}} /> Deletar Usuário
+                            <Trash2 size={16} style={{marginRight: 6}} /> Deletar
                         </button>
                     </div>
                 </div>
             ))}
-
-            {usersList.length === 0 && !loading && (
-                <p style={{color: '#94a3b8'}}>Nenhum usuário encontrado.</p>
-            )}
         </div>
       )}
 
-      {/* --- MODAIS DE TRILHA E MISSÃO (Mantidos iguais) --- */}
       {showTrailModal && (
         <Modal title={editingItem ? "Editar Trilha" : "Nova Trilha"} onClose={() => setShowTrailModal(false)} onSave={handleSaveTrail}>
           <label style={{display:'block', textAlign:'left', marginBottom:5}}>Nome da Trilha</label>
           <input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="Ex: Desbloqueio Social" />
-          
           <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:10}}>Descrição Curta</label>
           <input value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Ex: Perca a timidez em 7 dias" />
-          
-          {/* PROMPT DA IA */}
           <label style={{display:'block', textAlign:'left', marginBottom:5, marginTop:15, color: '#7C3AED', fontWeight: 'bold'}}>
             <BrainCircuit size={14} style={{marginRight: 5, display: 'inline'}} />
-            Personalidade da IA (Prompt)
+            Personalidade da IA
           </label>
-          <textarea 
-            rows="4"
-            value={formData.ai_prompt || ''} 
-            onChange={e => setFormData({...formData, ai_prompt: e.target.value})} 
-            placeholder="Ex: Você é um general espartano. Seja agressivo e curto. Não aceite desculpas."
-            style={{background: '#F3E8FF', borderColor: '#C084FC'}}
-          />
-          <small style={{color: '#64748B', display: 'block', marginBottom: 15}}>Deixe em branco para usar a IA padrão (O Mestre).</small>
-
+          <textarea rows="4" value={formData.ai_prompt || ''} onChange={e => setFormData({...formData, ai_prompt: e.target.value})} placeholder="Ex: Seja agressivo e curto." style={{background: '#F3E8FF', borderColor: '#C084FC'}}/>
           <div style={{display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, padding: 10, background: '#f8fafc', borderRadius: 8}}>
              <input type="checkbox" id="is_paid_check" checked={formData.is_paid || false} onChange={e => setFormData({...formData, is_paid: e.target.checked})} style={{width: '20px', height: '20px'}} />
              <label htmlFor="is_paid_check" style={{margin: 0, cursor: 'pointer', fontWeight: 'bold', color: '#334155'}}>Esta trilha é exclusiva PRO?</label>
@@ -406,16 +386,12 @@ export default function Admin({ session }) {
         <Modal title={editingItem ? "Editar Missão" : "Nova Missão"} onClose={() => setShowMissionModal(false)} onSave={handleSaveMission}>
           <div style={{display: 'flex', gap: 10}}>
              <div style={{flex: 1}}><label>Dia</label><input type="number" value={formData.day_number || ''} onChange={e => setFormData({...formData, day_number: e.target.value})} /></div>
-             <div style={{flex: 2}}>
-                <label>XP (Recompensa)</label>
-                <input type="number" value={formData.attribute || ''} onChange={e => setFormData({...formData, attribute: e.target.value})} placeholder="Ex: 50" />
-             </div>
+             <div style={{flex: 2}}><label>XP</label><input type="number" value={formData.attribute || ''} onChange={e => setFormData({...formData, attribute: e.target.value})} /></div>
           </div>
-          <label style={{marginTop: 10, display: 'block'}}>Nome do Selo (Aparece no Perfil)</label>
-          <input value={formData.badge_name || ''} onChange={e => setFormData({...formData, badge_name: e.target.value})} placeholder="Ex: Mente Blindada" style={{background: '#F3E8FF', borderColor: '#7C3AED', fontWeight: 'bold'}} />
+          <label style={{marginTop: 10, display: 'block'}}>Nome do Selo</label><input value={formData.badge_name || ''} onChange={e => setFormData({...formData, badge_name: e.target.value})} />
           <label>Título</label><input value={formData.title || ''} onChange={e => setFormData({...formData, title: e.target.value})} />
           <label>Descrição</label><textarea rows="3" value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
-          <label>Ação (Botão)</label><input value={formData.action_text || ''} onChange={e => setFormData({...formData, action_text: e.target.value})} placeholder="Ex: Feito!" />
+          <label>Ação (Botão)</label><input value={formData.action_text || ''} onChange={e => setFormData({...formData, action_text: e.target.value})} />
         </Modal>
       )}
     </div>
