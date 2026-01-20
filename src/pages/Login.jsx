@@ -164,7 +164,10 @@ export default function Login() {
           alignItems: 'center'
       }}>
           
-          {/* REMOVIDO A LOGO DUPLICADA AQUI. FICOU LIMPO IGUAL AO PRINT. */}
+          {/* LOGO ACIMA DO TÍTULO */}
+          <div style={{display: 'flex', justifyContent: 'center', marginBottom: 20}}>
+              <img src="/logo.png" alt="Logo" style={{width: 60, height: 60, objectFit: 'contain'}} />
+          </div>
 
           <h2 style={{fontSize: '1.5rem', color: '#1e293b', marginBottom: 5, fontWeight: '800'}}>
               {isRecovery ? 'Recuperar Acesso' : 'Acesse a plataforma'}
