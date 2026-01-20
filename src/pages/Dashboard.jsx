@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { processReflection } from '../utils/aiCore';
+import { initMercadoPago, Payment } from '@mercadopago/sdk-react'; // <--- NOVA IMPORTAÇÃO
 import { User, Flame, Clock, Settings, X, Bell, Download, Share, UserPlus, Search, Check, Crown, Rocket, Zap, Lock, ChevronRight } from 'lucide-react';
+
+// INICIALIZA O MERCADO PAGO (Cole sua CHAVE PÚBLICA aqui)
+initMercadoPago('SUA_CHAVE_PUBLICA_AQUI', { locale: 'pt-BR' });
 
 export default function Dashboard({ session }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [preferenceId, setPreferenceId] = useState(null); // <--- Guarda o ID para o checkout
   
   // Dados Principais
   const [progress, setProgress] = useState(null);
@@ -66,15 +71,11 @@ export default function Dashboard({ session }) {
         }
 
         let { data: prog } = await supabase.from('user_progress').select('*').eq('user_id', session.user.id).maybeSingle();
-        
         const { data: trailsData } = await supabase.from('trails').select('*').order('position', { ascending: true });
         setAllTrails(trailsData || []);
 
         let trailId = prog?.trail_id;
-        
-        if (!trailId && trailsData?.length > 0) {
-            trailId = trailsData[0].id;
-        }
+        if (!trailId && trailsData?.length > 0) trailId = trailsData[0].id;
 
         if (trailId) {
             const { data: trail } = await supabase.from('trails').select('*').eq('id', trailId).single();
@@ -102,9 +103,10 @@ export default function Dashboard({ session }) {
     }
   };
 
-  const handlePayment = async () => {
+  const createPreference = async () => {
     setPaymentLoading(true);
     try {
+        // Chama a Edge Function para criar a preferência de pagamento
         const { data, error } = await supabase.functions.invoke('mercadopago', {
             body: { 
                 user_id: session.user.id,
@@ -114,20 +116,31 @@ export default function Dashboard({ session }) {
 
         if (error) throw error;
         
-        if (data?.init_point) {
+        // Se a função retornar o ID da preferência, salvamos no estado
+        if (data?.preference_id) {
+            setPreferenceId(data.preference_id); 
+        } else if (data?.init_point) {
+            // Fallback caso a função antiga ainda esteja retornando só o link
             window.location.href = data.init_point;
         } else {
-            alert("Erro ao gerar link de pagamento. Tente novamente.");
+            alert("Erro ao iniciar pagamento.");
         }
     } catch (error) {
         console.error("Erro Pagamento:", error);
-        alert("Erro ao conectar com o sistema de pagamento.");
+        alert("Erro ao conectar sistema.");
     } finally {
         setPaymentLoading(false);
     }
   };
 
   const openProModal = () => { setShowProPopup(true); };
+
+  const handlePaymentSuccess = async () => {
+      alert("Pagamento processado! Bem-vindo ao PRO.");
+      setShowProPopup(false);
+      setPreferenceId(null);
+      fetchData(); // Atualiza os dados para liberar o acesso
+  };
 
   const advanceToNextTrail = async () => {
       const { data: trails } = await supabase.from('trails').select('*').order('position', { ascending: true });
@@ -262,9 +275,9 @@ export default function Dashboard({ session }) {
         </div>
       </header>
 
-      {/* BANNER PRO */}
-{!isPro && activeTrail && (
-              <div onClick={openProModal} style={{
+      {/* BANNER PRO (Aparece se usuário não for PRO e tiver trilha carregada) */}
+      {!isPro && activeTrail && (
+          <div onClick={openProModal} style={{
               background: 'linear-gradient(90deg, #7C3AED 0%, #C084FC 100%)', color: '#fff', 
               padding: '12px 20px', borderRadius: 12, marginBottom: 30, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)'
@@ -336,27 +349,63 @@ export default function Dashboard({ session }) {
           </div>
       </div>
 
-      {/* MODAL PRO / PAGAMENTO */}
+      {/* --- MODAL PRO COM CHECKOUT TRANSPARENTE --- */}
       {showProPopup && (
-        <div className="popup-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 300, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-            <div className="mission-card" style={{width: '90%', maxWidth: '350px', textAlign: 'center', padding: '30px 20px'}}>
-                <div style={{background: '#F3E8FF', width: 60, height: 60, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'}}>
-                    <Rocket size={32} color="#7C3AED" />
+        <div className="popup-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 300, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', overflowY: 'auto'}}>
+            <div className="mission-card" style={{width: '90%', maxWidth: '400px', padding: '20px', maxHeight: '90vh', overflowY: 'auto'}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15}}>
+                    <h3 style={{margin: 0}}>Assinar Tryly PRO</h3>
+                    <button onClick={() => {setShowProPopup(false); setPreferenceId(null);}} style={{background: 'transparent', padding: 0, border: 'none', color: '#64748B'}}><X size={20}/></button>
                 </div>
-                <h3 style={{marginBottom: 10, color: '#1e293b'}}>Desbloqueie o Potencial</h3>
-                <p style={{color: '#64748B', marginBottom: 25, lineHeight: '1.5'}}>
-                    Tenha acesso ilimitado a todas as trilhas, mentoria avançada da IA e suporte prioritário.
-                </p>
-                <button 
-                    onClick={handlePayment} 
-                    disabled={paymentLoading}
-                    style={{width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10}}
-                >
-                    {paymentLoading ? 'Gerando Link...' : 'Assinar por R$ 9,90/mês'}
-                </button>
-                <button className="outline" onClick={() => setShowProPopup(false)} style={{width: '100%', marginTop: 10, border: 'none', color: '#64748B'}}>
-                    Talvez depois
-                </button>
+                
+                {!preferenceId ? (
+                    // TELA 1: OFERTA
+                    <>
+                        <div style={{background: '#F3E8FF', padding: 20, borderRadius: 12, textAlign: 'center', marginBottom: 20}}>
+                            <Rocket size={40} color="#7C3AED" style={{marginBottom: 10}}/>
+                            <h2 style={{color: '#7C3AED', fontSize: '1.5rem', margin: '0 0 5px 0'}}>R$ 9,90<small>/mês</small></h2>
+                            <p style={{color: '#64748B', fontSize: '0.9rem'}}>Acesso total e imediato.</p>
+                        </div>
+                        <p style={{fontSize: '0.9rem', color: '#475569', marginBottom: 15, lineHeight: 1.5}}>
+                            🚀 Tenha acesso ilimitado a todas as trilhas.<br/>
+                            🧠 Mentoria avançada da IA.<br/>
+                            👑 Ícone exclusivo no ranking.
+                        </p>
+                        <button 
+                            onClick={createPreference} 
+                            disabled={paymentLoading}
+                            style={{width: '100%', padding: 15, fontSize: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10}}
+                        >
+                            {paymentLoading ? 'Carregando...' : 'Pagar Agora'}
+                        </button>
+                    </>
+                ) : (
+                    // TELA 2: CHECKOUT EMBUTIDO (BRICK)
+                    <div id="payment-brick-container">
+                        <Payment
+                            initialization={{ preferenceId: preferenceId }}
+                            customization={{
+                                visual: {
+                                    style: {
+                                        theme: 'default', // ou 'dark'
+                                    },
+                                    hidePaymentButton: false
+                                },
+                                paymentMethods: {
+                                    creditCard: "all",
+                                    bankTransfer: "all", // PIX
+                                    ticket: "all", // Boleto
+                                },
+                            }}
+                            onSubmit={async ({ selectedPaymentMethod, formData }) => {
+                                console.log("Pagamento enviado!", formData);
+                                await handlePaymentSuccess();
+                                return new Promise((resolve) => resolve());
+                            }}
+                            onError={(error) => console.error('Erro no Brick:', error)}
+                        />
+                    </div>
+                )}
             </div>
         </div>
       )}

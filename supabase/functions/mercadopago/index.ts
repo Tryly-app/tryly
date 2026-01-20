@@ -59,10 +59,10 @@ serve(async (req) => {
       })
 
       const data = await mpResponse.json()
-      return new Response(JSON.stringify({ init_point: data.init_point }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+// Agora retornamos o ID também
+return new Response(JSON.stringify({ init_point: data.init_point, preference_id: data.id }), {
+  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+})
 
     // 2. WEBHOOK (CONFIRMA O PAGAMENTO)
     if (url.searchParams.get('topic') === 'payment' || req.json().type === 'payment') {
