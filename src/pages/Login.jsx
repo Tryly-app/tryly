@@ -111,21 +111,20 @@ export default function Login() {
           display: 'flex', 
           flexDirection: 'column', 
           justifyContent: 'center',
-          alignItems: 'center', // Centraliza tudo horizontalmente
+          alignItems: 'center',
           color: '#fff',
           position: 'relative',
-          textAlign: 'center' // Garante que o texto fique centralizado
+          textAlign: 'center'
       }}>
           <div style={{maxWidth: 600, margin: '0 auto'}}>
-            
-             {/* LOGO CENTRALIZADA E BRANCA */}
+             {/* Logo Branca */}
              <div style={{marginBottom: 40}}>
                 <img 
                   src="/logo.png" 
                   alt="Tryly" 
                   style={{
                       width: 140, 
-                      filter: 'brightness(0) invert(1)', // Transforma a logo em branca
+                      filter: 'brightness(0) invert(1)',
                       opacity: 0.95
                   }} 
                 />
@@ -135,17 +134,15 @@ export default function Login() {
                 O Tryly é um sistema de treino comportamental.
              </h1>
              
-             {/* TEXTO CORRIGIDO (SEM NEGRITO) */}
              <p style={{fontSize: '1.2rem', color: '#E9D5FF', lineHeight: '1.6', marginBottom: 40}}>
                 Aqui você age, lê a realidade e toma decisões que sustentam no dia a dia.
              </p>
 
-             {/* BARRA DESTAQUE CENTRALIZADA */}
              <div style={{
-                 display: 'inline-block', // Para a borda ficar justa ao texto
+                 display: 'inline-block',
                  borderLeft: '4px solid #fff', 
                  paddingLeft: 20, 
-                 textAlign: 'left' // O texto interno volta a ser alinhado à esquerda para leitura
+                 textAlign: 'left'
              }}>
                  <p style={{fontSize: '1.4rem', fontWeight: 'bold', margin: 0, opacity: 0.9}}>Não é motivação.</p>
                  <p style={{fontSize: '1.4rem', fontWeight: 'bold', color: '#fff', margin: 0}}>É prática.</p>
@@ -153,7 +150,7 @@ export default function Login() {
           </div>
       </div>
 
-      {/* --- COLUNA DIREITA: FORMULÁRIO (MANTIDO) --- */}
+      {/* --- COLUNA DIREITA: FORMULÁRIO --- */}
       <div style={{
           flex: '1 1 450px', 
           display: 'flex', 
@@ -165,6 +162,9 @@ export default function Login() {
         <div style={{width: '100%', maxWidth: '400px'}}>
             
             <div style={{textAlign: 'center', marginBottom: 30}}>
+                {/* LOGO COLORIDA NO FORMULÁRIO */}
+                <img src="/logo.png" alt="Logo" style={{width: 70, borderRadius: 12, marginBottom: 20}} />
+
                 <h2 style={{fontSize: '1.5rem', color: '#1e293b', marginBottom: 5}}>
                     {isRecovery ? 'Recuperar Acesso' : (isSignUp ? 'Crie sua conta' : 'Acesse a plataforma')}
                 </h2>
@@ -189,21 +189,32 @@ export default function Login() {
 
                 {isSignUp && !isRecovery && (
                 <div style={{marginBottom: 15}}>
-                    <input type="text" placeholder="Seu Nome" required value={fullName} onChange={e => setFullName(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1'}} />
+                    <input type="text" placeholder="Seu Nome" required value={fullName} onChange={e => setFullName(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', outline: 'none'}} />
                 </div>
                 )}
                 
                 <div style={{marginBottom: 15}}>
-                    <input type="email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1'}} />
+                    <input type="email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', outline: 'none'}} />
                 </div>
                 
                 {!isRecovery && (
-                    <div style={{marginBottom: 15}}>
-                        <input type="password" placeholder="Senha" required value={password} onChange={e => setPassword(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1'}} />
+                    <div style={{marginBottom: 10}}>
+                        <input type="password" placeholder="Senha" required value={password} onChange={e => setPassword(e.target.value)} style={{width: '100%', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', outline: 'none'}} />
+                        
+                        {/* LINK "ESQUECI A SENHA" DISCRETO E ABAIXO DO INPUT */}
+                        <div style={{textAlign: 'right', marginTop: 8}}>
+                            <button 
+                                type="button" 
+                                onClick={() => {setIsRecovery(true); setErrorMsg(null);}} 
+                                style={{background: 'transparent', border: 'none', color: '#64748B', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'none'}}
+                            >
+                                Esqueceu sua senha?
+                            </button>
+                        </div>
                     </div>
                 )}
 
-                <button type="submit" disabled={loading} style={{width: '100%', padding: 12, background: '#7C3AED', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', opacity: loading ? 0.7 : 1}}>
+                <button type="submit" disabled={loading} style={{width: '100%', padding: 12, background: '#7C3AED', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', opacity: loading ? 0.7 : 1, marginTop: isRecovery ? 10 : 15}}>
                 {loading ? 'Processando...' : (isRecovery ? 'Enviar Link' : (isSignUp ? 'Cadastrar' : 'Entrar'))}
                 </button>
             </form>
@@ -228,13 +239,9 @@ export default function Login() {
                         <ArrowLeft size={16} /> Voltar
                      </button>
                 ) : (
-                    <>
-                        <button onClick={() => {setIsRecovery(true); setErrorMsg(null);}} style={{background: 'transparent', border: 'none', color: '#64748B', textDecoration: 'underline', cursor: 'pointer', marginBottom: 10}}>Esqueci a senha</button>
-                        <br/>
-                        <button onClick={() => {setIsSignUp(!isSignUp); setErrorMsg(null);}} style={{background: 'transparent', border: 'none', color: '#7C3AED', fontWeight: 'bold', cursor: 'pointer'}}>
-                            {isSignUp ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastre-se'}
-                        </button>
-                    </>
+                    <button onClick={() => {setIsSignUp(!isSignUp); setErrorMsg(null);}} style={{background: 'transparent', border: 'none', color: '#7C3AED', fontWeight: 'bold', cursor: 'pointer'}}>
+                        {isSignUp ? 'Já tem conta? Entrar' : 'Não tem conta? Cadastre-se'}
+                    </button>
                 )}
             </div>
         </div>
