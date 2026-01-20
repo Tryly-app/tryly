@@ -105,15 +105,15 @@ export default function Login() {
       
       {/* --- PARTE SUPERIOR (ROXA) --- */}
       <div style={{
-          background: '#6d28d9', // Roxo vibrante do print
-          padding: '40px 30px 50px 30px',
+          background: '#6d28d9',
+          padding: '40px 30px 60px 30px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
           position: 'relative'
       }}>
           
-          {/* LOGO PEQUENA + NOME (Estilo Favicon) */}
+          {/* HEADER LOGO BRANCO */}
           <div style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 30}}>
               <div style={{
                   background: 'rgba(255,255,255,0.15)', 
@@ -121,18 +121,18 @@ export default function Login() {
                   borderRadius: 10, 
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                  <img src="/logo.png" alt="Logo" style={{width: 24, height: 24, objectFit: 'contain'}} />
+                  {/* FILTRO PARA DEIXAR BRANCO */}
+                  <img src="/logo.png" alt="Logo" style={{width: 24, height: 24, objectFit: 'contain', filter: 'brightness(0) invert(1)'}} />
               </div>
               <span style={{color: '#fff', fontWeight: 'bold', fontSize: '1.2rem'}}>tryly</span>
           </div>
 
-          {/* TEXTO GRANDE (PRETO/ESCURO SOBRE ROXO - Conforme Print) */}
           <h1 style={{
               fontSize: '2.5rem', 
               lineHeight: '1.1', 
               fontWeight: '900', 
               marginBottom: 20, 
-              color: '#1a1a1a' // Cor escura conforme a imagem enviada
+              color: '#1a1a1a' 
           }}>
              O Tryly é um sistema de treino comportamental.
           </h1>
@@ -141,14 +141,15 @@ export default function Login() {
              Aqui você age, lê a realidade e <strong>toma decisões</strong> que sustentam no dia a dia.
           </p>
 
-          {/* BARRA LATERAL COM TEXTO */}
+          {/* BARRA LATERAL */}
           <div style={{
              display: 'flex',
              flexDirection: 'column',
              borderLeft: '4px solid #fff',
              paddingLeft: 15
           }}>
-             <span style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#4ade80'}}>Não é motivação.</span>
+             {/* VOLTANDO PARA CINZA */}
+             <span style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#9ca3af'}}>Não é motivação.</span>
              <span style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#fff'}}>É prática.</span>
           </div>
       </div>
@@ -163,12 +164,7 @@ export default function Login() {
           alignItems: 'center'
       }}>
           
-          {/* LOGO CENTRALIZADA */}
-          <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 30}}>
-              <img src="/logo.png" alt="Tryly" style={{width: 50, marginBottom: 5}} />
-              <div style={{color: '#4c1d95', fontWeight: 'bold', fontSize: '1.2rem', lineHeight: 1}}>Tryly</div>
-              <div style={{color: '#94a3b8', fontSize: '0.7rem'}}>#GoTry.</div>
-          </div>
+          {/* REMOVIDO A LOGO DUPLICADA AQUI. FICOU LIMPO IGUAL AO PRINT. */}
 
           <h2 style={{fontSize: '1.5rem', color: '#1e293b', marginBottom: 5, fontWeight: '800'}}>
               {isRecovery ? 'Recuperar Acesso' : 'Acesse a plataforma'}
