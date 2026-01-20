@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { AlertCircle, ArrowLeft, Mail, Rocket } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 
-// Ícone do Google (Mantido)
+// Ícone do Google
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -22,7 +22,6 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null); 
 
-  // Atualiza título da aba dinamicamente
   useEffect(() => {
     document.title = "Tryly | Treino comportamental para ação e decisão real.";
   }, []);
@@ -104,7 +103,7 @@ export default function Login() {
   return (
     <div style={{display: 'flex', minHeight: '100vh', flexDirection: 'row', flexWrap: 'wrap'}}>
       
-      {/* --- COLUNA ESQUERDA: CONCEITO (NOVO TEXTO) --- */}
+      {/* --- COLUNA ESQUERDA: CONCEITO --- */}
       <div style={{
           flex: '1 1 500px', 
           background: 'linear-gradient(135deg, #4C1D95 0%, #7C3AED 100%)', 
@@ -116,19 +115,23 @@ export default function Login() {
           position: 'relative'
       }}>
           <div style={{maxWidth: 600, margin: '0 auto'}}>
-            <div style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 30}}>
-                <div style={{background: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: 12}}>
-                    <Rocket size={28} color="#fff" />
-                </div>
-                <span style={{fontSize: '1.5rem', fontWeight: 'bold', letterSpacing: '-1px'}}>tryly</span>
+            
+             {/* LOGO NO TOPO */}
+             <div style={{marginBottom: 30}}>
+                <img 
+                  src="/logo.png" 
+                  alt="Tryly" 
+                  style={{width: 100, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.2)'}} 
+                />
              </div>
 
              <h1 style={{fontSize: '2.8rem', lineHeight: '1.1', fontWeight: '800', marginBottom: 25}}>
                 O Tryly é um sistema de treino comportamental.
              </h1>
              
+             {/* TEXTO ATUALIZADO */}
              <p style={{fontSize: '1.2rem', color: '#E9D5FF', lineHeight: '1.6', marginBottom: 30}}>
-                Aqui você age, lê a realidade e constrói decisões que sustentam no dia a dia.
+                Aqui você age, lê a realidade e <strong>toma decisões</strong> que sustentam no dia a dia.
              </p>
 
              <div style={{borderLeft: '4px solid #fff', paddingLeft: 20}}>
@@ -138,7 +141,7 @@ export default function Login() {
           </div>
       </div>
 
-      {/* --- COLUNA DIREITA: FORMULÁRIO (LÓGICA MANTIDA) --- */}
+      {/* --- COLUNA DIREITA: FORMULÁRIO (MANTIDO) --- */}
       <div style={{
           flex: '1 1 450px', 
           display: 'flex', 
@@ -150,7 +153,7 @@ export default function Login() {
         <div style={{width: '100%', maxWidth: '400px'}}>
             
             <div style={{textAlign: 'center', marginBottom: 30}}>
-                <img src="/logo.png" alt="Logo" style={{width: 60, borderRadius: 10, marginBottom: 15}} />
+                {/* Logo menor para mobile/formulário também, caso queira manter identidade visual */}
                 <h2 style={{fontSize: '1.5rem', color: '#1e293b', marginBottom: 5}}>
                     {isRecovery ? 'Recuperar Acesso' : (isSignUp ? 'Crie sua conta' : 'Acesse a plataforma')}
                 </h2>
@@ -159,7 +162,6 @@ export default function Login() {
                 </p>
             </div>
 
-            {/* FORMULÁRIO */}
             <form onSubmit={isRecovery ? handleRecovery : handleAuth}>
                 
                 {errorMsg && (
@@ -195,7 +197,6 @@ export default function Login() {
                 </button>
             </form>
 
-            {/* BOTÕES EXTRAS (Google, Trocar modo) */}
             {!isRecovery && (
                 <>
                     <div style={{display: 'flex', alignItems: 'center', margin: '20px 0', color: '#94a3b8'}}>
