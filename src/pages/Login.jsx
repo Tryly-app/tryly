@@ -124,7 +124,7 @@ export default function Login() {
                   {/* FILTRO PARA DEIXAR BRANCO */}
                   <img src="/logo.png" alt="Logo" style={{width: 24, height: 24, objectFit: 'contain', filter: 'brightness(0) invert(1)'}} />
               </div>
-              <span style={{color: '#fff', fontWeight: 'bold', fontSize: '1.2rem'}}>tryly</span>
+              <span style={{color: '#fff', fontWeight: 'bold', fontSize: '1.2rem'}}>Tryly</span>
           </div>
 
           <h1 style={{
@@ -166,7 +166,7 @@ export default function Login() {
           
           {/* LOGO ACIMA DO TÍTULO */}
           <div style={{display: 'flex', justifyContent: 'center', marginBottom: 20}}>
-              <img src="/logo.png" alt="Logo" style={{width: 60, height: 60, objectFit: 'contain'}} />
+              <img src="/logo.png" alt="Logo" style={{width: 100, height: 100, objectFit: 'contain'}} />
           </div>
 
           <h2 style={{fontSize: '1.5rem', color: '#1e293b', marginBottom: 5, fontWeight: '800'}}>
