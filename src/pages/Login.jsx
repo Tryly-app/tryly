@@ -111,30 +111,42 @@ export default function Login() {
           display: 'flex', 
           flexDirection: 'column', 
           justifyContent: 'center',
+          alignItems: 'center', // Centraliza tudo horizontalmente
           color: '#fff',
-          position: 'relative'
+          position: 'relative',
+          textAlign: 'center' // Garante que o texto fique centralizado
       }}>
           <div style={{maxWidth: 600, margin: '0 auto'}}>
             
-             {/* LOGO NO TOPO */}
-             <div style={{marginBottom: 30}}>
+             {/* LOGO CENTRALIZADA E BRANCA */}
+             <div style={{marginBottom: 40}}>
                 <img 
                   src="/logo.png" 
                   alt="Tryly" 
-                  style={{width: 100, borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.2)'}} 
+                  style={{
+                      width: 140, 
+                      filter: 'brightness(0) invert(1)', // Transforma a logo em branca
+                      opacity: 0.95
+                  }} 
                 />
              </div>
 
-             <h1 style={{fontSize: '2.8rem', lineHeight: '1.1', fontWeight: '800', marginBottom: 25}}>
+             <h1 style={{fontSize: '2.5rem', lineHeight: '1.2', fontWeight: '800', marginBottom: 25}}>
                 O Tryly é um sistema de treino comportamental.
              </h1>
              
-             {/* TEXTO ATUALIZADO */}
-             <p style={{fontSize: '1.2rem', color: '#E9D5FF', lineHeight: '1.6', marginBottom: 30}}>
-                Aqui você age, lê a realidade e <strong>toma decisões</strong> que sustentam no dia a dia.
+             {/* TEXTO CORRIGIDO (SEM NEGRITO) */}
+             <p style={{fontSize: '1.2rem', color: '#E9D5FF', lineHeight: '1.6', marginBottom: 40}}>
+                Aqui você age, lê a realidade e toma decisões que sustentam no dia a dia.
              </p>
 
-             <div style={{borderLeft: '4px solid #fff', paddingLeft: 20}}>
+             {/* BARRA DESTAQUE CENTRALIZADA */}
+             <div style={{
+                 display: 'inline-block', // Para a borda ficar justa ao texto
+                 borderLeft: '4px solid #fff', 
+                 paddingLeft: 20, 
+                 textAlign: 'left' // O texto interno volta a ser alinhado à esquerda para leitura
+             }}>
                  <p style={{fontSize: '1.4rem', fontWeight: 'bold', margin: 0, opacity: 0.9}}>Não é motivação.</p>
                  <p style={{fontSize: '1.4rem', fontWeight: 'bold', color: '#fff', margin: 0}}>É prática.</p>
              </div>
@@ -153,7 +165,6 @@ export default function Login() {
         <div style={{width: '100%', maxWidth: '400px'}}>
             
             <div style={{textAlign: 'center', marginBottom: 30}}>
-                {/* Logo menor para mobile/formulário também, caso queira manter identidade visual */}
                 <h2 style={{fontSize: '1.5rem', color: '#1e293b', marginBottom: 5}}>
                     {isRecovery ? 'Recuperar Acesso' : (isSignUp ? 'Crie sua conta' : 'Acesse a plataforma')}
                 </h2>
