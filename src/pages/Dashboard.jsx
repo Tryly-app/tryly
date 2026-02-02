@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import confetti from 'canvas-confetti';
 import { supabase } from '../supabaseClient';
 import { processReflection } from '../utils/aiCore';
-import { User, Flame, Clock, Settings, X, Bell, Download, Share, UserPlus, Search, Check, Crown, Rocket, Zap, Lock, ChevronRight } from 'lucide-react';
+import { getStoredInviteId, clearStoredInviteId } from './Invite';
+import { User, Flame, Clock, Settings, X, Bell, Download, Share, Share2, UserPlus, Search, Check, Crown, Rocket, Zap, Lock, ChevronRight, Calendar } from 'lucide-react';
 
 export default function Dashboard({ session }) {
   const navigate = useNavigate();
@@ -14,9 +16,16 @@ export default function Dashboard({ session }) {
   const [currentMission, setCurrentMission] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [activeTrail, setActiveTrail] = useState(null);
-  const [allTrails, setAllTrails] = useState([]); 
+  const [allTrails, setAllTrails] = useState([]);
+  const [totalMissionsInTrail, setTotalMissionsInTrail] = useState(14); 
+  const [nextMission, setNextMission] = useState(null);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [longestStreak, setLongestStreak] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPro, setIsPro] = useState(false);
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
+  const [weeklyData, setWeeklyData] = useState({ daysCompleted: 0, xp: 0 });
+  const confettiFired = useRef(false);
   
   // Popups
   const [deferredPrompt, setDeferredPrompt] = useState(null); 
@@ -52,6 +61,17 @@ export default function Dashboard({ session }) {
 
     fetchData();
 
+    const inviteId = getStoredInviteId();
+    if (inviteId && inviteId !== session?.user?.id) {
+      clearStoredInviteId();
+      setSearchId(inviteId);
+      setShowFriendsModal(true);
+      setFriendTab('add');
+      supabase.from('profiles').select('*').eq('id', inviteId).single().then(({ data: profile }) => {
+        if (profile) { setSearchResult(profile); setFriendMsg(''); }
+      });
+    }
+
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, [session]);
 
@@ -63,6 +83,8 @@ export default function Dashboard({ session }) {
             setAvatarUrl(profile.avatar_url);
             setIsAdmin(profile.role === 'admin');
             setIsPro(profile.is_pro || false);
+            setCurrentStreak(profile.current_streak ?? 0);
+            setLongestStreak(profile.longest_streak ?? 0);
         }
 
         let { data: prog } = await supabase.from('user_progress').select('*').eq('user_id', session.user.id).maybeSingle();
@@ -79,6 +101,8 @@ export default function Dashboard({ session }) {
         if (trailId) {
             const { data: trail } = await supabase.from('trails').select('*').eq('id', trailId).single();
             setActiveTrail(trail);
+            const { count } = await supabase.from('missions').select('*', { count: 'exact', head: true }).eq('trail_id', trailId);
+            setTotalMissionsInTrail(count ?? 14);
 
             if (!prog) {
                  const { data: newProg } = await supabase.from('user_progress').insert({ user_id: session.user.id, current_day: 1, trail_id: trailId, status: 'new' }).select().single();
@@ -91,8 +115,10 @@ export default function Dashboard({ session }) {
 
         if (prog && trailId) {
           let { data: mission } = await supabase.from('missions').select('*').eq('trail_id', trailId).eq('day_number', prog.current_day).maybeSingle(); 
+          const { data: next } = await supabase.from('missions').select('*').eq('trail_id', trailId).eq('day_number', prog.current_day + 1).maybeSingle();
           setProgress(prog);
           setCurrentMission(mission);
+          setNextMission(next ?? null);
           checkReminder(prog);
         }
     } catch (error) {
@@ -173,10 +199,11 @@ export default function Dashboard({ session }) {
       } else { setRequestsList([]); }
   };
 
-  const searchUser = async () => {
-      if (!searchId || searchId === session.user.id) return;
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', searchId).single();
-      if (profile) { setSearchResult(profile); setFriendMsg(''); } else { setSearchResult(null); setFriendMsg("ID não encontrado."); }
+  const searchUser = async (idOverride) => {
+      const id = idOverride ?? searchId;
+      if (!id || id === session.user.id) return;
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', id).single();
+      if (profile) { setSearchResult(profile); setFriendMsg(''); setSearchId(id); } else { setSearchResult(null); setFriendMsg("ID não encontrado."); }
   };
 
   const sendFriendRequest = async () => {
@@ -205,13 +232,23 @@ export default function Dashboard({ session }) {
     
     setAiResponse(feedback);
     const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const prevCompleted = progress?.last_completed_at;
+    const newStreak = (prevCompleted === yesterdayStr) ? (currentStreak + 1) : 1;
+    const newLongest = Math.max(longestStreak, newStreak);
+
     await supabase.from('reflections').insert({ user_id: session.user.id, mission_id: currentMission.id, mission_day: currentMission.day_number, user_text: reflectionText, ai_feedback: feedback });
     await supabase.from('user_progress').update({ last_completed_at: today, status: 'completed', current_day: progress.current_day + 1 }).eq('user_id', session.user.id);
-    
-    const { data: nextMission } = await supabase.from('missions').select('id').eq('trail_id', activeTrail.id).eq('day_number', progress.current_day + 1).maybeSingle();
+    await supabase.from('profiles').update({ current_streak: newStreak, longest_streak: newLongest }).eq('id', session.user.id);
+
+    setCurrentStreak(newStreak);
+    setLongestStreak(newLongest);
+    const { data: nextMissionData } = await supabase.from('missions').select('id').eq('trail_id', activeTrail.id).eq('day_number', progress.current_day + 1).maybeSingle();
     setLoading(false);
     
-    if (!nextMission) { setView('trail_finished'); } else { setView('feedback'); }
+    if (!nextMissionData) { setView('trail_finished'); } else { setView('feedback'); }
   };
 
   const checkReminder = (prog) => {
@@ -230,7 +267,23 @@ export default function Dashboard({ session }) {
   const backToHome = () => { setView('dashboard'); fetchData(); };
   const handlePopupAction = () => { setShowReminder(false); progress.status === 'in_progress' ? setView('reflection') : setView('dashboard'); };
 
-  if (loading && !aiResponse) return <div className="container center"><p>Carregando...</p></div>;
+  function DashboardSkeleton() {
+    return (
+      <div className="container">
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div><div className="skeleton" style={{ height: 12, width: 100, marginBottom: 8 }} /><div className="skeleton" style={{ height: 24, width: 120 }} /></div>
+          <div className="skeleton" style={{ width: 45, height: 45, borderRadius: '50%' }} />
+        </header>
+        <div style={{ marginBottom: 30 }}><div className="skeleton" style={{ height: 14, width: '70%', marginBottom: 8 }} /><div className="skeleton" style={{ height: 8, borderRadius: 10, width: '100%' }} /></div>
+        <div className="mission-card" style={{ padding: 24 }}>
+          <div className="skeleton" style={{ height: 28, width: 80, marginBottom: 12 }} />
+          <div className="skeleton" style={{ height: 24, width: '90%', marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 16, width: '60%' }} />
+        </div>
+      </div>
+    );
+  }
+  if (loading && !aiResponse) return <DashboardSkeleton />;
 
   if (view === 'trail_finished') {
       return (
@@ -245,20 +298,74 @@ export default function Dashboard({ session }) {
   }
 
   if (view === 'reflection') return ( <div className="container"><h2>Check-in Diário</h2><p className="mb-4">Como foi realizar: <strong>"{currentMission?.action_text}"</strong>?</p><textarea rows="6" placeholder="Escreva aqui..." value={reflectionText} onChange={e => setReflectionText(e.target.value)} /><button onClick={submitReflection} disabled={loading}>{loading ? 'Analisando...' : 'Enviar Relato'}</button><button className="outline mt-4" onClick={() => setView('dashboard')}>Cancelar</button></div> );
-  if (view === 'feedback') return ( <div className="container center" style={{justifyContent:'center'}}><div style={{fontSize: '4rem', marginBottom: 10}}>✨</div><h2 style={{color: '#7C3AED'}}>Missão Cumprida!</h2><div className="mission-card" style={{border: 'none', background: '#F3E8FF', boxShadow: 'none'}}><small style={{fontWeight: 'bold'}}>FEEDBACK DO SISTEMA</small><p style={{color: '#4B5563', fontStyle: 'italic', marginTop: 15}}>"{aiResponse}"</p><div className="status-badge" style={{marginTop: 20, background: '#fff'}}>+ {currentMission?.attribute} XP</div></div><button onClick={backToHome} style={{marginTop: 30}}>Voltar ao Menu</button></div> );
+  if (view === 'feedback') {
+    if (!confettiFired.current) {
+      confettiFired.current = true;
+      confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } });
+    }
+    const handleShare = async () => {
+      const text = `Completei o dia ${currentMission?.day_number} da trilha no Tryly! +${currentMission?.attribute} XP`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'Tryly', text, url: window.location.origin });
+        } catch (e) { if (e.name !== 'AbortError') navigator.clipboard?.writeText(text); }
+      } else {
+        navigator.clipboard?.writeText(text);
+      }
+    };
+    return (
+      <div className="container center" style={{ justifyContent: 'center' }}>
+        <div style={{ fontSize: '4rem', marginBottom: 10 }}>✨</div>
+        <h2 style={{ color: 'var(--primary)' }}>Missão Cumprida!</h2>
+        <div className="mission-card" style={{ border: 'none', background: 'var(--primary-light)', boxShadow: 'none' }}>
+          <small style={{ fontWeight: 'bold' }}>FEEDBACK DO SISTEMA</small>
+          <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 15 }}>"{aiResponse}"</p>
+          <div className="status-badge" style={{ marginTop: 20, background: 'var(--surface)' }}>+ {currentMission?.attribute} XP</div>
+        </div>
+        <button type="button" className="outline" onClick={handleShare} style={{ marginTop: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Share2 size={18} /> Compartilhar conquista
+        </button>
+        <button onClick={() => { confettiFired.current = false; backToHome(); }} style={{ marginTop: 15 }}>Voltar ao Menu</button>
+      </div>
+    );
+  }
   if (view === 'mission') return ( <div className="container"><div className="status-badge">Dia {currentMission?.day_number}</div><h1>{currentMission?.title}</h1><p style={{fontSize: '1.1rem', marginTop: 20}}>{currentMission?.description}</p><div className="mission-card"><h3 style={{color: '#7C3AED'}}>Sua Ação</h3><p style={{fontWeight: '600', fontSize: '1.2rem'}}>{currentMission?.action_text}</p></div><div style={{marginTop: 'auto'}}><button onClick={startMission}>Aceitar Desafio</button><button className="outline mt-4" onClick={() => setView('dashboard')}>Voltar</button></div></div> );
 
   const locked = isMissionLocked();
-  const percent = progress ? Math.min(100, Math.round(((progress.current_day - 1) / 14) * 100)) : 0;
+  const totalDays = Math.max(1, totalMissionsInTrail);
+  const percent = progress ? Math.min(100, Math.round(((progress.current_day - 1) / totalDays) * 100)) : 0;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const lastCompleted = progress?.last_completed_at;
+  const daysSinceCompleted = lastCompleted ? Math.floor((new Date(todayStr) - new Date(lastCompleted)) / (1000 * 60 * 60 * 24)) : 0;
+  const isPaused = !locked && progress && lastCompleted && daysSinceCompleted > 1;
+
+  const fetchWeeklyData = async () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(now);
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+    const startWeek = monday.toISOString().split('T')[0];
+    const { data: weekReflections } = await supabase.from('reflections').select('*, missions(attribute)').eq('user_id', session.user.id).gte('created_at', startWeek);
+    const uniqueDays = new Set(weekReflections?.map(r => r.created_at?.split('T')[0]) || []);
+    const xp = weekReflections?.reduce((acc, r) => acc + (parseInt(r.missions?.attribute) || 0), 0) ?? 0;
+    setWeeklyData({ daysCompleted: uniqueDays.size, xp });
+  };
 
   return (
     <div className="container" style={{position: 'relative'}}>
       <header style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
-        <div><small style={{textTransform: 'uppercase', fontWeight: 'bold', color: '#94a3b8', fontSize: '0.7rem'}}>Bem-vindo de volta</small><h2 style={{margin: 0}}>{firstName}</h2></div>
+        <div>
+          <small style={{textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--text-muted)', fontSize: '0.7rem'}}>Bem-vindo de volta</small>
+          <h2 style={{margin: 0}}>{firstName}</h2>
+          {currentStreak > 0 && <span style={{fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4}}><Flame size={12} /> {currentStreak} dia{currentStreak !== 1 ? 's' : ''} seguidos</span>}
+        </div>
         <div style={{display: 'flex', gap: 10}}>
-            <button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%', borderColor: '#7C3AED', color:'#7C3AED'}} onClick={() => { setShowFriendsModal(true); fetchFriendsData(); }}> <UserPlus size={20}/> </button>
-            {isAdmin && (<button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%', borderColor: '#7C3AED', color:'#7C3AED'}} onClick={() => navigate('/admin')}><Settings size={20}/></button>)}
-            <div onClick={() => navigate('/profile')} style={{width: 45, height: 45, borderRadius: '50%', background: '#E2E8F0', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>{avatarUrl ? <img src={avatarUrl} alt="Perfil" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : <User size={24} color="#64748B"/>}</div>
+            <button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%', borderColor: 'var(--primary)', color: 'var(--primary)'}} onClick={() => { setShowWeeklyModal(true); fetchWeeklyData(); }} title="Sua semana"><Calendar size={20}/></button>
+            <button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%', borderColor: 'var(--primary)', color: 'var(--primary)'}} onClick={() => { setShowFriendsModal(true); fetchFriendsData(); }}> <UserPlus size={20}/> </button>
+            {isAdmin && (<button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%', borderColor: 'var(--primary)', color: 'var(--primary)'}} onClick={() => navigate('/admin')}><Settings size={20}/></button>)}
+            <div onClick={() => navigate('/profile')} style={{width: 45, height: 45, borderRadius: '50%', background: 'var(--surface)', border: '1px solid var(--primary-light)', overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>{avatarUrl ? <img src={avatarUrl} alt="Perfil" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : <User size={24} color="var(--text-muted)"/>}</div>
         </div>
       </header>
 
@@ -284,15 +391,27 @@ export default function Dashboard({ session }) {
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8}}><div><h3 style={{margin: 0, fontSize: '1.1rem'}}>{activeTrail?.title || 'Carregando...'}</h3><small style={{color: '#64748B'}}>{activeTrail?.description}</small></div><span style={{fontWeight: 'bold', color: '#7C3AED'}}>{percent}%</span></div>
         <div className="progress-container"><div className="progress-fill" style={{width: `${percent}%`}}></div></div>
       </div>
+      {isPaused && (
+        <div style={{background: 'linear-gradient(90deg, #FEF3C7 0%, #FDE68A 100%)', border: '1px solid #F59E0B', color: '#92400E', padding: '12px 16px', borderRadius: 12, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10}}>
+          <Clock size={20} />
+          <span style={{fontWeight: '600', fontSize: '0.9rem'}}>Retome de onde parou — sua missão está esperando.</span>
+        </div>
+      )}
       <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
         {!currentMission ? (<div className="mission-card"><h3>Trilha Finalizada!</h3><p>Você completou todas as missões.</p><button onClick={advanceToNextTrail} style={{marginTop: 15}}>Próxima Trilha</button></div>) : (
             <div className={`mission-card ${locked ? 'locked-card' : ''}`}>
-            {locked ? (<> <Clock size={40} style={{color: '#94a3b8', marginBottom: 15}} /> <h3>Missão Concluída</h3> <p>Descanse.</p> <div style={{background: '#e2e8f0', padding: '8px', borderRadius: 8, display: 'inline-block', fontSize: '0.8rem', fontWeight: 'bold', color: '#64748B', marginTop: 10}}> Próxima missão: 00:00 </div> </>) : (
+            {locked ? (<> <Clock size={40} style={{color: 'var(--text-muted)', marginBottom: 15}} /> <h3>Missão Concluída</h3> <p>Descanse.</p> <div style={{background: 'var(--skeleton-bg)', padding: '8px', borderRadius: 8, display: 'inline-block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-muted)', marginTop: 10}}> Próxima missão: 00:00 </div> </>) : (
                 <> <div className="status-badge"><Flame size={14} style={{marginRight: 5}}/> Dia {currentMission?.day_number}</div> <h2 style={{fontSize: '1.8rem', marginBottom: 10}}>{currentMission?.title}</h2> <p>{currentMission?.action_text}</p> {progress?.status === 'in_progress' ? <button onClick={finishMission} style={{marginTop: 30}}>Concluir Missão</button> : <button onClick={() => setView('mission')} style={{marginTop: 30}}>Ver Detalhes</button>} </>
             )}
             </div>
         )}
       </div>
+      {nextMission && !locked && (
+        <div style={{marginTop: 20, padding: 16, borderRadius: 12, border: '1px dashed var(--primary)', background: 'var(--primary-light)', opacity: 0.9}}>
+          <small style={{fontWeight: 'bold', color: 'var(--primary)', textTransform: 'uppercase', fontSize: '0.7rem'}}>Amanhã</small>
+          <p style={{margin: '6px 0 0', fontWeight: '600', color: 'var(--text-main)'}}>{nextMission.title}</p>
+        </div>
+      )}
 
       <div style={{marginTop: 40}}>
           <h3 style={{fontSize: '1rem', color: '#64748B', marginBottom: 15, paddingLeft: 5}}>Sua Jornada</h3>
@@ -358,6 +477,33 @@ export default function Dashboard({ session }) {
                     Talvez depois
                 </button>
             </div>
+        </div>
+      )}
+
+      {/* MODAL SUA SEMANA */}
+      {showWeeklyModal && (
+        <div className="popup-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 300, background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+          <div className="mission-card" style={{width: '90%', maxWidth: '340px', textAlign: 'center', padding: '28px 20px'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20}}>
+              <h3 style={{margin: 0, display: 'flex', alignItems: 'center', gap: 8}}><Calendar size={22} color="var(--primary)" /> Sua semana</h3>
+              <button onClick={() => setShowWeeklyModal(false)} style={{width: 'auto', padding: 5, background: 'transparent', color: 'var(--text-muted)', border: 'none'}}><X size={20}/></button>
+            </div>
+            <div style={{display: 'flex', gap: 20, justifyContent: 'center', marginBottom: 20}}>
+              <div style={{background: 'var(--primary-light)', padding: 16, borderRadius: 12, flex: 1}}>
+                <div style={{fontSize: '1.8rem', fontWeight: '800', color: 'var(--primary)'}}>{weeklyData.daysCompleted}</div>
+                <small style={{color: 'var(--text-muted)', fontWeight: '600'}}>dias completos</small>
+              </div>
+              <div style={{background: 'var(--primary-light)', padding: 16, borderRadius: 12, flex: 1}}>
+                <div style={{fontSize: '1.8rem', fontWeight: '800', color: 'var(--primary)'}}>{weeklyData.xp}</div>
+                <small style={{color: 'var(--text-muted)', fontWeight: '600'}}>XP da semana</small>
+              </div>
+            </div>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6}}>
+              <Flame size={18} color="var(--primary)" />
+              <span style={{fontWeight: 'bold', color: 'var(--primary)'}}>{currentStreak} dia{currentStreak !== 1 ? 's' : ''} seguidos</span>
+            </div>
+            <button className="outline" onClick={() => setShowWeeklyModal(false)} style={{marginTop: 20}}>Fechar</button>
+          </div>
         </div>
       )}
 

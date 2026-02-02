@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Lock, Save, History, Copy, Check, LogOut, Zap } from 'lucide-react';
+import { ArrowLeft, Camera, Lock, Save, History, Copy, Check, LogOut, Zap, Flame, Link2, Moon, Sun } from 'lucide-react';
+import { getStoredTheme, setStoredTheme, applyTheme } from '../utils/theme';
 
 export default function Profile({ session }) {
   const navigate = useNavigate();
@@ -10,11 +11,14 @@ export default function Profile({ session }) {
   const [uploading, setUploading] = useState(false);
   const [history, setHistory] = useState([]);
   const [totalXp, setTotalXp] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [longestStreak, setLongestStreak] = useState(0);
+  const [darkMode, setDarkMode] = useState(() => getStoredTheme() === 'dark');
+  const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   
   // Estado local para garantir que temos o usuário, mesmo se a 'session' falhar
-  const [currentUser, setCurrentUser] = useState(session?.user || null);
-  
-  const [copied, setCopied] = useState(false); 
+  const [currentUser, setCurrentUser] = useState(session?.user || null); 
   const [fullName, setFullName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -58,6 +62,8 @@ export default function Profile({ session }) {
         if (profile) {
           setFullName(profile.full_name || '');
           setAvatarUrl(profile.avatar_url || `https://ui-avatars.com/api/?name=${user.email}&background=random`);
+          setCurrentStreak(profile.current_streak ?? 0);
+          setLongestStreak(profile.longest_streak ?? 0);
         }
 
         // 2. Histórico e Cálculo de XP
@@ -138,24 +144,80 @@ export default function Profile({ session }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyInviteLink = () => {
+    if (!currentUser) return;
+    const link = `${window.location.origin}/invite/${currentUser.id}`;
+    navigator.clipboard.writeText(link);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const toggleDarkMode = () => {
+    const next = darkMode ? 'light' : 'dark';
+    setDarkMode(!darkMode);
+    setStoredTheme(next);
+    applyTheme(next);
+  };
+
   if (!currentUser) return <div className="container center"><p>Carregando perfil...</p></div>;
 
   return (
     <div className="container">
-      <header style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 30}}>
-        <button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%'}} onClick={() => navigate('/app')}>
-          <ArrowLeft size={20}/>
+      <header style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+          <button className="outline" style={{padding: 10, width: 'auto', borderRadius: '50%'}} onClick={() => navigate('/app')}>
+            <ArrowLeft size={20}/>
+          </button>
+          <h2 style={{margin: 0}}>Meu Perfil</h2>
+        </div>
+        <button className="outline" style={{padding: 10, width: 'auto', borderRadius: 12}} onClick={toggleDarkMode} title={darkMode ? 'Modo claro' : 'Modo escuro'}>
+          {darkMode ? <Sun size={20} color="var(--primary)" /> : <Moon size={20} color="var(--text-muted)" />}
         </button>
-        <h2 style={{margin: 0}}>Meu Perfil</h2>
       </header>
 
+      {/* STREAK */}
+      {(currentStreak > 0 || longestStreak > 0) && (
+        <div style={{display: 'flex', gap: 12, marginBottom: 20}}>
+          {currentStreak > 0 && (
+            <div style={{flex: 1, background: 'var(--primary-light)', padding: 12, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8}}>
+              <Flame size={20} color="var(--primary)" />
+              <div>
+                <strong style={{color: 'var(--primary)', fontSize: '1.1rem'}}>{currentStreak}</strong>
+                <small style={{display: 'block', color: 'var(--text-muted)', fontSize: '0.75rem'}}>dias seguidos</small>
+              </div>
+            </div>
+          )}
+          {longestStreak > 0 && (
+            <div style={{flex: 1, background: 'var(--primary-light)', padding: 12, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8}}>
+              <Zap size={20} color="var(--primary)" />
+              <div>
+                <strong style={{color: 'var(--primary)', fontSize: '1.1rem'}}>{longestStreak}</strong>
+                <small style={{display: 'block', color: 'var(--text-muted)', fontSize: '0.75rem'}}>recorde</small>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ÁREA DE ID */}
-      <div style={{background: '#F1F5F9', padding: 15, borderRadius: 12, marginBottom: 20, border: '1px dashed #94A3B8'}}>
-        <small style={{display: 'block', color: '#64748B', marginBottom: 5, fontWeight: 'bold'}}>SEU ID DE AMIGO</small>
+      <div style={{background: 'var(--primary-light)', padding: 15, borderRadius: 12, marginBottom: 12, border: '1px dashed var(--primary)'}}>
+        <small style={{display: 'block', color: 'var(--text-muted)', marginBottom: 5, fontWeight: 'bold'}}>SEU ID DE AMIGO</small>
         <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10}}>
-            <code style={{fontSize: '0.8rem', wordBreak: 'break-all', background: '#fff', padding: 5, borderRadius: 4, flex: 1, color: '#334155'}}>{currentUser.id}</code>
-            <button onClick={copyUserId} style={{width: 'auto', padding: 8, fontSize: '0.8rem', background: copied ? '#22c55e' : '#334155', color: '#fff', border: 'none', borderRadius: 6}}>
+            <code style={{fontSize: '0.8rem', wordBreak: 'break-all', background: 'var(--surface)', padding: 5, borderRadius: 4, flex: 1, color: 'var(--text-main)'}}>{currentUser.id}</code>
+            <button onClick={copyUserId} style={{width: 'auto', padding: 8, fontSize: '0.8rem', background: copied ? '#22c55e' : 'var(--primary)', color: '#fff', border: 'none', borderRadius: 6}}>
                 {copied ? <Check size={16}/> : <Copy size={16}/>}
+            </button>
+        </div>
+      </div>
+
+      {/* LINK DE CONVITE */}
+      <div style={{background: 'var(--primary-light)', padding: 15, borderRadius: 12, marginBottom: 20, border: '1px dashed var(--primary)'}}>
+        <small style={{display: 'block', color: 'var(--text-muted)', marginBottom: 5, fontWeight: 'bold'}}>LINK DE CONVITE</small>
+        <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 10}}>Envie este link para alguém adicionar você como amigo.</p>
+        <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+            <code style={{fontSize: '0.75rem', wordBreak: 'break-all', background: 'var(--surface)', padding: 8, borderRadius: 4, flex: 1, color: 'var(--text-main)'}}>{typeof window !== 'undefined' ? `${window.location.origin}/invite/${currentUser.id}` : ''}</code>
+            <button onClick={copyInviteLink} style={{width: 'auto', padding: 8, fontSize: '0.8rem', background: linkCopied ? '#22c55e' : 'var(--primary)', color: '#fff', border: 'none', borderRadius: 6}}>
+                {linkCopied ? <Check size={16}/> : <Link2 size={16}/>}
             </button>
         </div>
       </div>

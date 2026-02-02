@@ -27,25 +27,21 @@ export default function Privacy() {
         </p>
 
         <h3 style={{marginTop: 20}}>1. Coleta de Dados</h3>
-        <p>
-          Coletamos apenas o necessário para o funcionamento do jogo:
-          <ul style={{paddingLeft: 20, marginTop: 5}}>
-            <li>Seu E-mail (para login e recuperação de senha).</li>
-            <li>Seu Nome (para o ranking).</li>
-            <li>Seus relatórios de missão (para a IA analisar e dar feedback).</li>
-          </ul>
-        </p>
+        <p>Coletamos apenas o necessário para o funcionamento do jogo:</p>
+        <ul style={{paddingLeft: 20, marginTop: 5}}>
+          <li>Seu E-mail (para login e recuperação de senha).</li>
+          <li>Seu Nome (para o ranking).</li>
+          <li>Seus relatórios de missão (para a IA analisar e dar feedback).</li>
+        </ul>
 
         <h3 style={{marginTop: 20}}>2. Uso das Informações</h3>
-        <p>
-          Seus dados são usados exclusivamente para:
-          <ul style={{paddingLeft: 20, marginTop: 5}}>
-            <li>Autenticação no sistema.</li>
-            <li>Gerar feedback personalizado via Inteligência Artificial.</li>
-            <li>Exibir seu progresso no ranking entre amigos.</li>
-          </ul>
-          <strong>Nós nunca vendemos seus dados para terceiros.</strong>
-        </p>
+        <p>Seus dados são usados exclusivamente para:</p>
+        <ul style={{paddingLeft: 20, marginTop: 5}}>
+          <li>Autenticação no sistema.</li>
+          <li>Gerar feedback personalizado via Inteligência Artificial.</li>
+          <li>Exibir seu progresso no ranking entre amigos.</li>
+        </ul>
+        <p><strong>Nós nunca vendemos seus dados para terceiros.</strong></p>
 
         <h3 style={{marginTop: 20}}>3. Exclusão de Dados</h3>
         <p>

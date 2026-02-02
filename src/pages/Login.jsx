@@ -57,7 +57,7 @@ export default function Login() {
         if (result.data?.user?.identities?.length === 0) {
             throw new Error("Este email já existe.");
         }
-        alert("Cadastro realizado! Faça login.");
+        setSuccessMsg("Cadastro realizado! Faça login.");
         setIsSignUp(false);
       }
 
@@ -132,7 +132,7 @@ export default function Login() {
               lineHeight: '1.1', 
               fontWeight: '900', 
               marginBottom: 20, 
-              color: '#1a1a1a' 
+              color: '#fff' 
           }}>
              O Tryly é um sistema de treino comportamental.
           </h1>
